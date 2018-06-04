@@ -87,10 +87,10 @@ zend_object *vapor_object_new(zend_class_entry *ce)
     vapor_tpl *vapor;
 
     // vapor = ecalloc(1, sizeof(vapor_tpl) + zend_object_properties_size(ce));
-	vapor = (vapor_tpl *) ecalloc(1, sizeof(vapor_tpl));
+    vapor = (vapor_tpl *) ecalloc(1, sizeof(vapor_tpl));
 
     zend_object_std_init(&vapor->std, ce);
-	// object_properties_init(&vapor->std, ce);
+    // object_properties_init(&vapor->std, ce);
     vapor->std.handlers = &vapor_object_handlers;
 
     return &vapor->std;
@@ -448,8 +448,8 @@ static PHP_METHOD(Vapor, path)
     char *path = NULL;
 
     if (zend_parse_parameters_none() == FAILURE) {
-		return;
-	}
+        return;
+    }
 
     path = vapor_path(GetThis());
     if (path) {
@@ -516,6 +516,7 @@ static PHP_METHOD(Vapor, include)
 
     if (vapor->filename) efree(vapor->filename);
     vapor->filename = estrdup(filename);
+
     if (vapor->filepath) efree(vapor->filepath);
     vapor->filepath = vapor_path(object);
 
@@ -710,8 +711,8 @@ PHP_MINIT_FUNCTION(vapor)
     vapor_ce = zend_register_internal_class(&ce);
 
     memcpy(&vapor_object_handlers, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
-    vapor_object_handlers.offset         = XtOffsetOf(vapor_tpl, std);
-    vapor_object_handlers.free_obj       = vapor_free_storage;
+    vapor_object_handlers.offset   = XtOffsetOf(vapor_tpl, std);
+    vapor_object_handlers.free_obj = vapor_free_storage;
     // vapor_object_handlers.read_property  = vapor_get_property;
     // vapor_object_handlers.write_property = vapor_set_property;
 
