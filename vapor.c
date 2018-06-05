@@ -31,26 +31,26 @@
 
 #include "php_vapor.h"
 
-ZEND_DECLARE_MODULE_GLOBALS(vapor)
-
 zend_object_handlers vapor_object_handlers;
 zend_class_entry *vapor_ce;
 //static int le_vapor;
+
+// ZEND_DECLARE_MODULE_GLOBALS(vapor)
+
+/* {{{ vapor_init_globals */
+// static void vapor_init_globals(zend_vapor_globals *vapor_globals)
+// {
+//     memset(vapor_globals, 0, sizeof(zend_vapor_globals));
+//     vapor_globals->path = "";
+//     vapor_globals->extension = "php";
+// }
+/* }}} */
 
 /* {{{ PHP_INI */
 // PHP_INI_BEGIN()
 //     STD_PHP_INI_ENTRY("vapor.path", "", PHP_INI_ALL, OnUpdateString, path, zend_vapor_globals, vapor_globals)
 //     STD_PHP_INI_ENTRY("vapor.extension", "php", PHP_INI_ALL, OnUpdateString, extension, zend_vapor_globals, vapor_globals)
 // PHP_INI_END()
-/* }}} */
-
-/* {{{ vapor_init_globals */
-static void vapor_init_globals(zend_vapor_globals *vapor_globals)
-{
-    memset(vapor_globals, 0, sizeof(zend_vapor_globals));
-    vapor_globals->path = "";
-    vapor_globals->extension = "php";
-}
 /* }}} */
 
 /* {{{ vapor_free_storage */
@@ -412,12 +412,7 @@ static PHP_METHOD(Vapor, setExtension)
     ZEND_PARSE_PARAMETERS_END();
 
     vapor = Z_VAPOR_P(GetThis());
-
-    // free original value
-    if (vapor->extension) {
-        efree(vapor->extension);
-    }
-    vapor->extension = estrdup(ext);
+    VAPOR_SET_VALUE(extension, ext, 1);
 }
 /* }}} */
 
@@ -462,20 +457,16 @@ static PHP_METHOD(Vapor, path)
 /* {{{ proto void Vapor::layout(string layout) */
 static PHP_METHOD(Vapor, layout)
 {
-    char *layout;
+    char *_layout;
     size_t len;
     vapor_tpl *vapor;
 
     ZEND_PARSE_PARAMETERS_START(1, 1)
-        Z_PARAM_STRING(layout, len)
+        Z_PARAM_STRING(_layout, len)
     ZEND_PARSE_PARAMETERS_END();
 
     vapor = Z_VAPOR_P(GetThis());
-
-    if (vapor->layout) {
-        efree(vapor->layout);
-    }
-    vapor->layout = estrdup(layout);
+    VAPOR_SET_VALUE(layout, _layout, 1);
 }
 /* }}} */
 
@@ -514,11 +505,8 @@ static PHP_METHOD(Vapor, include)
     object = GetThis();
     vapor = Z_VAPOR_P(object);
 
-    if (vapor->filename) efree(vapor->filename);
-    vapor->filename = estrdup(filename);
-
-    if (vapor->filepath) efree(vapor->filepath);
-    vapor->filepath = vapor_path(object);
+    VAPOR_SET_VALUE(filename, filename, 1);
+    VAPOR_SET_VALUE(filepath, vapor_path(object), 0);
 
     zval content;
     ZVAL_UNDEF(&content);
@@ -614,15 +602,15 @@ static PHP_METHOD(Vapor, render)
         ZVAL_ZVAL(&content_copy, &content, 0, 1);
         zend_hash_str_update(vapor->sections, "content", sizeof("content")-1, &content_copy);
 
-        vapor_set_value(filename, vapor->layout, 1);
-        vapor_set_value(filepath, vapor_path(object), 0);
-        vapor_set_null(layout);
+        VAPOR_SET_VALUE(filename, vapor->layout, 1);
+        VAPOR_SET_VALUE(filepath, vapor_path(object), 0);
+        VAPOR_SET_NULL(layout);
 
         vapor_render(vapor->filepath, &EG(symbol_table), NULL, &content);
     }
 
-    vapor_set_null(filename);
-    vapor_set_null(filepath);
+    VAPOR_SET_NULL(filename);
+    VAPOR_SET_NULL(filepath);
 
     // RETURN_ZVAL(&content, 0, 1);
     ZVAL_ZVAL(return_value, &content, 0, 1);

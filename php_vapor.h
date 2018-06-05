@@ -66,7 +66,7 @@ static inline vapor_tpl *php_vapor_fetch_object(zend_object *obj) {
 
 #define GetThis() ((Z_TYPE(EX(This)) == IS_OBJECT) ? &EX(This) : NULL)
 
-#define vapor_set_value(name, val, copy) \
+#define VAPOR_SET_VALUE(name, val, copy) \
     if (vapor->name) {                   \
         efree(vapor->name);              \
     }                                    \
@@ -76,7 +76,7 @@ static inline vapor_tpl *php_vapor_fetch_object(zend_object *obj) {
         vapor->name = val;               \
     }
 
-#define vapor_set_null(name) \
+#define VAPOR_SET_NULL(name) \
     if (vapor->name) {       \
         efree(vapor->name);  \
         vapor->name = NULL;  \
