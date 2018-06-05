@@ -38,10 +38,10 @@ zend_class_entry *vapor_ce;
 //static int le_vapor;
 
 /* {{{ PHP_INI */
-PHP_INI_BEGIN()
-    STD_PHP_INI_ENTRY("vapor.path", "", PHP_INI_ALL, OnUpdateString, path, zend_vapor_globals, vapor_globals)
-    STD_PHP_INI_ENTRY("vapor.extension", "php", PHP_INI_ALL, OnUpdateString, extension, zend_vapor_globals, vapor_globals)
-PHP_INI_END()
+// PHP_INI_BEGIN()
+//     STD_PHP_INI_ENTRY("vapor.path", "", PHP_INI_ALL, OnUpdateString, path, zend_vapor_globals, vapor_globals)
+//     STD_PHP_INI_ENTRY("vapor.extension", "php", PHP_INI_ALL, OnUpdateString, extension, zend_vapor_globals, vapor_globals)
+// PHP_INI_END()
 /* }}} */
 
 /* {{{ vapor_init_globals */
@@ -704,7 +704,7 @@ PHP_MINIT_FUNCTION(vapor)
     // register resource dtor
     // le_vapor = zend_register_list_destructors_ex(vapor_resource_dtor, NULL, "Vapor Template", module_number);
 
-    REGISTER_INI_ENTRIES();
+    // REGISTER_INI_ENTRIES();
 
     INIT_CLASS_ENTRY(ce, "Vapor", vapor_methods);
     ce.create_object = vapor_object_new;
@@ -736,7 +736,7 @@ PHP_MINFO_FUNCTION(vapor)
     php_info_print_table_row(2, "Version", VAPOR_VERSION);
     php_info_print_table_end();
 
-    DISPLAY_INI_ENTRIES();
+    // DISPLAY_INI_ENTRIES();
 }
 /* }}} */
 

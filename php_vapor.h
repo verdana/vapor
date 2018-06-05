@@ -62,11 +62,10 @@ struct _vapor_tpl {
 static inline vapor_tpl *php_vapor_fetch_object(zend_object *obj) {
     return (vapor_tpl *)((char *)(obj) - XtOffsetOf(vapor_tpl, std));
 }
-
 #define Z_VAPOR_P(zv) php_vapor_fetch_object(Z_OBJ_P(zv))
 
 #define GetThis() ((Z_TYPE(EX(This)) == IS_OBJECT) ? &EX(This) : NULL)
-#define this_ptr  GetThis()
+
 #define vapor_set_value(name, val, copy) \
     if (vapor->name) {                   \
         efree(vapor->name);              \
@@ -83,12 +82,12 @@ static inline vapor_tpl *php_vapor_fetch_object(zend_object *obj) {
         vapor->name = NULL;  \
     }
 
-ZEND_BEGIN_MODULE_GLOBALS(vapor)
-    char *path;
-    char *extension;
-ZEND_END_MODULE_GLOBALS(vapor)
+// ZEND_BEGIN_MODULE_GLOBALS(vapor)
+//     char *path;
+//     char *extension;
+// ZEND_END_MODULE_GLOBALS(vapor)
 
-#define VAPOR_G(v) ZEND_MODULE_GLOBALS_ACCESSOR(vapor, v)
+// #define VAPOR_G(v) ZEND_MODULE_GLOBALS_ACCESSOR(vapor, v)
 
 #endif /* PHP_VAPOR_H */
 
