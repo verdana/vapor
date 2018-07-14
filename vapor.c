@@ -29,7 +29,7 @@
 #include "ext/standard/php_string.h"
 #include "zend_exceptions.h"
 
-#include "php_vapor.h"
+#include "vapor.h"
 
 zend_object_handlers vapor_object_handlers;
 zend_class_entry *vapor_ce;
@@ -56,7 +56,7 @@ zend_class_entry *vapor_ce;
 /* {{{ vapor_free_storage */
 void vapor_free_storage(zend_object *obj)
 {
-    vapor_tpl *vapor = php_vapor_fetch_object(obj);
+    vapor_core *vapor = php_vapor_fetch_object(obj);
 
     if (vapor->basepath)  efree(vapor->basepath);
     if (vapor->filename)  efree(vapor->filename);
@@ -84,10 +84,10 @@ void vapor_free_storage(zend_object *obj)
 /* {{{ vapor_object_new */
 zend_object *vapor_object_new(zend_class_entry *ce)
 {
-    vapor_tpl *vapor;
+    vapor_core *vapor;
 
-    // vapor = ecalloc(1, sizeof(vapor_tpl) + zend_object_properties_size(ce));
-    vapor = (vapor_tpl *) ecalloc(1, sizeof(vapor_tpl));
+    // vapor = ecalloc(1, sizeof(vapor_core) + zend_object_properties_size(ce));
+    vapor = (vapor_core *) ecalloc(1, sizeof(vapor_core));
 
     zend_object_std_init(&vapor->std, ce);
     // object_properties_init(&vapor->std, ce);
@@ -100,7 +100,7 @@ zend_object *vapor_object_new(zend_class_entry *ce)
 /* {{{ vapor_set_property */
 static void vapor_set_property(zval *object, zval *key, zval *value, void **cache_slot)
 {
-    vapor_tpl *vapor = Z_VAPOR_P(object);
+    vapor_core *vapor = Z_VAPOR_P(object);
     convert_to_string(key);
 
     std_object_handlers.write_property(object, key, value, cache_slot);
@@ -110,7 +110,7 @@ static void vapor_set_property(zval *object, zval *key, zval *value, void **cach
 /* {{{ vapor_unset_property */
 static void vapor_unset_property(zval *object, zval *key, void **cache_slot)
 {
-    vapor_tpl *vapor = Z_VAPOR_P(object);
+    vapor_core *vapor = Z_VAPOR_P(object);
     convert_to_string(key);
 
     std_object_handlers.unset_property(object, key, cache_slot);
@@ -158,7 +158,7 @@ static void vapor_copy_userdata(HashTable *symtable, HashTable *data)
 static char *vapor_path(zval *object)
 {
     char *filepath;
-    vapor_tpl *vapor;
+    vapor_core *vapor;
 
     vapor = Z_VAPOR_P(object);
 
@@ -200,7 +200,7 @@ static int vapor_file_exists(zval *obj, char *filepath)
 /* {{{ zend_bool vapor_get_callback() */
 static zend_bool vapor_get_callback(INTERNAL_FUNCTION_PARAMETERS, char *func_name, zval **callback)
 {
-    vapor_tpl *vapor = Z_VAPOR_P(GetThis());
+    vapor_core *vapor = Z_VAPOR_P(GetThis());
 
     if ((*callback = zend_hash_str_find(vapor->functions, func_name, strlen(func_name))) != NULL) {
         if (zend_is_callable(*callback, 0, 0)) {
@@ -269,7 +269,7 @@ static PHP_METHOD(Vapor, __construct)
 {
     char *path, *ext = NULL, resolved_path[MAXPATHLEN];
     size_t path_len, ext_len;
-    vapor_tpl *vapor;
+    vapor_core *vapor;
 
     ZEND_PARSE_PARAMETERS_START(1, 2)
         Z_PARAM_STRING(path, path_len)
@@ -354,7 +354,7 @@ static PHP_METHOD(Vapor, __call)
 /* {{{ proto void Vapor::addFolder(string path) */
 static PHP_METHOD(Vapor, addFolder)
 {
-    vapor_tpl *vapor;
+    vapor_core *vapor;
     char *folder, resolved_path[MAXPATHLEN];
     size_t len;
     zval *val;
@@ -405,7 +405,7 @@ static PHP_METHOD(Vapor, setExtension)
 {
     char *ext;
     size_t ext_len;
-    vapor_tpl *vapor;
+    vapor_core *vapor;
 
     ZEND_PARSE_PARAMETERS_START(1, 1)
         Z_PARAM_STRING(ext, ext_len)
@@ -421,7 +421,7 @@ static PHP_METHOD(Vapor, register)
 {
     char *name;
     size_t len;
-    vapor_tpl *vapor;
+    vapor_core *vapor;
     zval *func, tmp;
 
     ZEND_PARSE_PARAMETERS_START(2, 2)
@@ -459,7 +459,7 @@ static PHP_METHOD(Vapor, layout)
 {
     char *_layout;
     size_t len;
-    vapor_tpl *vapor;
+    vapor_core *vapor;
 
     ZEND_PARSE_PARAMETERS_START(1, 1)
         Z_PARAM_STRING(_layout, len)
@@ -475,7 +475,7 @@ static PHP_METHOD(Vapor, section)
 {
     char *content, *section;
     size_t len;
-    vapor_tpl *vapor;
+    vapor_core *vapor;
     zval *tmp;
 
     ZEND_PARSE_PARAMETERS_START(1, 1)
@@ -495,7 +495,7 @@ static PHP_METHOD(Vapor, include)
 {
     char *filename;
     size_t len;
-    vapor_tpl *vapor;
+    vapor_core *vapor;
     zval *object;
 
     ZEND_PARSE_PARAMETERS_START(1, 1)
@@ -579,7 +579,7 @@ static PHP_METHOD(Vapor, render)
     char *filename = NULL;
     HashTable *data = NULL;
     size_t len;
-    vapor_tpl *vapor;
+    vapor_core *vapor;
     zval content, *object;
 
     ZEND_PARSE_PARAMETERS_START(1, 2)
@@ -699,7 +699,7 @@ PHP_MINIT_FUNCTION(vapor)
     vapor_ce = zend_register_internal_class(&ce);
 
     memcpy(&vapor_object_handlers, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
-    vapor_object_handlers.offset   = XtOffsetOf(vapor_tpl, std);
+    vapor_object_handlers.offset   = XtOffsetOf(vapor_core, std);
     vapor_object_handlers.free_obj = vapor_free_storage;
     // vapor_object_handlers.read_property  = vapor_get_property;
     // vapor_object_handlers.write_property = vapor_set_property;
