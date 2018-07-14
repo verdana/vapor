@@ -45,22 +45,24 @@ extern zend_module_entry vapor_module_entry;
 #define VAPOR_MAX_SECTIONS  256
 #define VAPOR_MAX_FUNCTIONS 256
 
-typedef struct _vapor_tpl vapor_tpl;
+typedef struct _vapor_core vapor_core;
+// typedef struct _vapor_template vapor_template;
 
-struct _vapor_tpl {
+struct _vapor_core {
     char *basepath;
     char *filename;
     char *filepath;
     char *extension;
     char *layout;
-    HashTable *folders;
-    HashTable *sections;
-    HashTable *functions;
+    zend_array *folders;
+    zend_array *sections;
+    zend_array *functions;
     zend_object std;
 };
 
-static inline vapor_tpl *php_vapor_fetch_object(zend_object *obj) {
-    return (vapor_tpl *)((char *)(obj) - XtOffsetOf(vapor_tpl, std));
+
+static inline vapor_core *php_vapor_fetch_object(zend_object *obj) {
+    return (vapor_core *)((char *)(obj) - XtOffsetOf(vapor_core, std));
 }
 #define Z_VAPOR_P(zv) php_vapor_fetch_object(Z_OBJ_P(zv))
 
