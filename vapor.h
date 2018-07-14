@@ -37,52 +37,40 @@ extern zend_module_entry vapor_module_entry;
 #endif
 
 #if defined(ZTS) && defined(COMPILE_DL_VAPOR)
-	ZEND_TSRMLS_CACHE_EXTERN()
+ZEND_TSRMLS_CACHE_EXTERN()
 #endif
 
-#define VAPOR_VERSION       "0.1.0-dev"
-#define VAPOR_MAX_FOLDERS   64
-#define VAPOR_MAX_SECTIONS  256
-#define VAPOR_MAX_FUNCTIONS 256
+#define VAPOR_VERSION           "0.1.0-dev"
+#define VAPOR_MAX_FOLDERS       64
+#define VAPOR_MAX_SECTIONS      256
+#define VAPOR_MAX_FUNCTIONS     256
 
-typedef struct _vapor_core vapor_core;
-// typedef struct _vapor_template vapor_template;
+typedef struct _vapor_core      vapor_core;
+typedef struct _vapor_template  vapor_template;
 
 struct _vapor_core {
-    char *basepath;
-    char *filename;
-    char *filepath;
-    char *extension;
-    char *layout;
-    zend_array *folders;
-    zend_array *sections;
-    zend_array *functions;
-    zend_object std;
+    char            *basepath;      //  0
+    char            *extension;     //  8
+    zend_array      *folders;       // 16
+    zend_array      *functions;     // 24
+    zend_array      *sections;      // 32
+    vapor_template  *current;       // 40
+    zend_object      std;           //
 };
 
+struct _vapor_template {
+    char            *folder;        //
+    char            *basename;      //
+    char            *filepath;      //
+    vapor_template  *layout;        //
+};
 
-static inline vapor_core *php_vapor_fetch_object(zend_object *obj) {
-    return (vapor_core *)((char *)(obj) - XtOffsetOf(vapor_core, std));
+static inline vapor_core *php_vapor_fetch_object(zend_object *obj)
+{
+    return (vapor_core *)((char *)(obj)-XtOffsetOf(vapor_core, std));
 }
 #define Z_VAPOR_P(zv) php_vapor_fetch_object(Z_OBJ_P(zv))
-
 #define GetThis() ((Z_TYPE(EX(This)) == IS_OBJECT) ? &EX(This) : NULL)
-
-#define VAPOR_SET_VALUE(name, val, copy) \
-    if (vapor->name) {                   \
-        efree(vapor->name);              \
-    }                                    \
-    if (copy) {                          \
-        vapor->name = estrdup(val);      \
-    } else {                             \
-        vapor->name = val;               \
-    }
-
-#define VAPOR_SET_NULL(name) \
-    if (vapor->name) {       \
-        efree(vapor->name);  \
-        vapor->name = NULL;  \
-    }
 
 // ZEND_BEGIN_MODULE_GLOBALS(vapor)
 //     char *path;

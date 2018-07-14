@@ -2,11 +2,13 @@
 *.lo
 *.loT
 *.la
+*.log
 .libs
 acinclude.m4
 aclocal.m4
 autom4te.cache/
 build/
+confdefs*
 config.guess
 config.h
 config.h.in
@@ -16,6 +18,7 @@ config.nice
 config.status
 config.sub
 configure*
+conftest*
 include
 install-sh
 libtool

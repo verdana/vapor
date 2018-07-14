@@ -1,19 +1,68 @@
 ---
-BasedOnStyle: WebKit
-AlignAfterOpenBracket: Align
-AlignConsecutiveAssignments: 'true'
-AllowShortBlocksOnASingleLine: 'false'
-AllowShortCaseLabelsOnASingleLine: 'false'
-AllowShortFunctionsOnASingleLine: None
-AllowShortIfStatementsOnASingleLine: 'true'
-AllowShortLoopsOnASingleLine: 'false'
-BreakBeforeBraces: WebKit
-IndentWidth: '4'
 Language: Cpp
-PointerAlignment: Right
-SortIncludes: 'false'
-Standard: Cpp11
-TabWidth: '4'
-UseTab: Never
+BasedOnStyle: LLVM
 
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: false
+# AlignConsecutiveMacros: true
+AlignEscapedNewlines: Left
+AlignTrailingComments: true
+AllowShortBlocksOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLoopsOnASingleLine: false
+BreakBeforeBraces: Linux
+BreakBeforeTernaryOperators: true
+ColumnLimit: 120
+Cpp11BracedListStyle: true
+
+ForEachMacros:
+    - 'ZEND_HASH_FOREACH_BUCKET'
+    - 'ZEND_HASH_FOREACH_END_DEL'
+    - 'ZEND_HASH_FOREACH_KEY_PTR'
+    - 'ZEND_HASH_FOREACH_KEY_VAL_IND'
+    - 'ZEND_HASH_FOREACH_KEY_VAL'
+    - 'ZEND_HASH_FOREACH_KEY'
+    - 'ZEND_HASH_FOREACH_NUM_KEY_PTR'
+    - 'ZEND_HASH_FOREACH_NUM_KEY_VAL'
+    - 'ZEND_HASH_FOREACH_NUM_KEY'
+    - 'ZEND_HASH_FOREACH_PTR'
+    - 'ZEND_HASH_FOREACH_STR_KEY_PTR'
+    - 'ZEND_HASH_FOREACH_STR_KEY_VAL_IND'
+    - 'ZEND_HASH_FOREACH_STR_KEY_VAL'
+    - 'ZEND_HASH_FOREACH_STR_KEY'
+    - 'ZEND_HASH_FOREACH_VAL_IND'
+    - 'ZEND_HASH_FOREACH_VAL'
+    - 'ZEND_HASH_REVERSE_FOREACH_BUCKET'
+    - 'ZEND_HASH_REVERSE_FOREACH_KEY_VAL_IND'
+    - 'ZEND_HASH_REVERSE_FOREACH_KEY_VAL'
+    - 'ZEND_HASH_REVERSE_FOREACH_PTR'
+    - 'ZEND_HASH_REVERSE_FOREACH_STR_KEY_VAL'
+    - 'ZEND_HASH_REVERSE_FOREACH_VAL_IND'
+    - 'ZEND_HASH_REVERSE_FOREACH_VAL'
+    - 'ZEND_HASH_REVERSE_FOREACH'
+
+IndentPPDirectives: None
+IndentWidth: 4
+MaxEmptyLinesToKeep: 1
+PointerAlignment: Right
+ReflowComments: true
+SortIncludes: true
+SortUsingDeclarations: true
+SpaceAfterCStyleCast: false
+SpaceAfterTemplateKeyword: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 1
+SpacesInAngles: false
+SpacesInContainerLiterals: false
+SpacesInCStyleCastParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+Standard: Cpp11
+TabWidth: 4
+UseTab: Never
 ...

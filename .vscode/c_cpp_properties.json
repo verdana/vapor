@@ -3,7 +3,10 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "D:/Github/php-src/**",
+                "D:/Github/php-src/main",
+                "D:/Github/php-src/Zend"
             ],
             "defines": [
                 "_DEBUG",
