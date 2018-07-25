@@ -49,13 +49,13 @@ typedef struct _vapor_core      vapor_core;
 typedef struct _vapor_template  vapor_template;
 
 struct _vapor_core {
-    char            *basepath;      //  0
-    char            *extension;     //  8
-    zend_array      *folders;       // 16
-    zend_array      *functions;     // 24
-    zend_array      *sections;      // 32
-    vapor_template  *current;       // 40
-    zend_object      std;           //
+    char            *basepath;      //   0
+    char            *extension;     //   8
+    zend_array      *folders;       //  16
+    zend_array      *functions;     //  24
+    zend_array      *sections;      //  32
+    vapor_template  *current;       //  40
+    zend_object      std;           // 104
 };
 
 struct _vapor_template {

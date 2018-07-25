@@ -168,7 +168,6 @@ static void vapor_copy_userdata(zend_array *symtable, zend_array *data)
 static inline void vapor_split_filename(char *filename, char **folder, char **basename)
 {
     char *src, *last = NULL;
-    char *fd = NULL, *bn = NULL;
 
     src = estrdup(filename);
     if (!strchr(src, ':')) {
@@ -178,11 +177,8 @@ static inline void vapor_split_filename(char *filename, char **folder, char **ba
         return;
     }
 
-    fd = php_strtok_r(src, ":", &last);
-    bn = php_strtok_r(NULL, ":", &last);
-
-    *folder = estrdup(fd);
-    *basename = estrdup(bn);
+    *folder = estrdup(php_strtok_r(src, ":", &last));
+    *basename = estrdup(php_strtok_r(NULL, ":", &last));
 
     efree(src);
 }
