@@ -80,15 +80,14 @@ void vapor_free_storage(zend_object *obj)
 /* }}} */
 
 /* {{{ zend_object *vapor_object_new(zend_class_entry *ce) */
-zend_object *vapor_object_new(zend_class_entry *ce)
+static inline zend_object *vapor_object_new(zend_class_entry *ce)
 {
     vapor_core *vapor;
 
-    // vapor = ecalloc(1, sizeof(vapor_core) + zend_object_properties_size(ce));
-    vapor = (vapor_core *)ecalloc(1, sizeof(vapor_core));
+    vapor = ecalloc(1, sizeof(vapor_core) + zend_object_properties_size(ce));
 
     zend_object_std_init(&vapor->std, ce);
-    // object_properties_init(&vapor->std, ce);
+    object_properties_init(&vapor->std, ce);
     vapor->std.handlers = &vapor_object_handlers;
 
     return &vapor->std;
@@ -105,6 +104,33 @@ static void vapor_set_property(zval *object, zval *key, zval *value, void **cach
 }
 /* }}} */
 
+/* {{{ zval *vapor_get_property(zval *object, zval *member, int type, void **cache_slot, zval *rv) */
+static zval *vapor_get_property(zval *object, zval *member, int type, void **cache_slot, zval *rv)
+{
+    vapor_core *vapor;
+    zval tmp_member;
+    zval *retval = NULL;
+    // zend_object_handlers *std_handler;
+
+    if (Z_TYPE_P(member) != IS_STRING) {
+        tmp_member = *member;
+        zval_copy_ctor(&tmp_member);
+        convert_to_string(&tmp_member);
+        member = &tmp_member;
+    }
+
+    // vapor       = Z_VAPOR_P(object);
+    // std_handler = zend_get_std_object_handlers();
+    retval      = std_object_handlers.read_property(object, member, type, cache_slot, rv);
+
+    if (member == &tmp_member) {
+        zval_dtor(member);
+    }
+
+    return retval;
+}
+/* }}} */
+
 /* {{{ void vapor_unset_property(zval *object, zval *key, void **cache_slot) */
 static void vapor_unset_property(zval *object, zval *key, void **cache_slot)
 {
@@ -112,23 +138,6 @@ static void vapor_unset_property(zval *object, zval *key, void **cache_slot)
     convert_to_string(key);
 
     std_object_handlers.unset_property(object, key, cache_slot);
-}
-/* }}} */
-
-/* {{{ char *vapor_get_property(zval *object, char *key) */
-static char *vapor_get_property(zval *object, char *key)
-{
-    zval *res, rv;
-
-    res = zend_read_property(vapor_ce, object, key, strlen(key), 1, &rv);
-    ZVAL_DEREF(res);
-    zval_ptr_dtor(&rv);
-
-    if (Z_TYPE_P(res) == IS_STRING && Z_STRLEN_P(res) > 0) {
-        zval tmp;
-        ZVAL_ZVAL(&tmp, res, 0, 1);
-        return Z_STRVAL(tmp);
-    }
 }
 /* }}} */
 
@@ -332,6 +341,9 @@ static PHP_METHOD(Vapor, __construct)
         ALLOC_HASHTABLE(vapor->functions);
         zend_hash_init(vapor->functions, VAPOR_MAX_FUNCTIONS, NULL, ZVAL_PTR_DTOR, 0);
     }
+
+    zend_update_property_string(vapor_ce, GetThis(), "basepath", sizeof("basepath") - 1, vapor->basepath);
+    zend_update_property_string(vapor_ce, GetThis(), "extension", sizeof("extension") - 1, vapor->extension);
 }
 /* }}} */
 
@@ -389,8 +401,6 @@ static PHP_METHOD(Vapor, addFolder)
     size_t len1, len2;
     vapor_core *vapor;
     zend_bool fallback = 0;
-    zend_string *key;
-    zval *val;
 
     ZEND_PARSE_PARAMETERS_START(2, 2)
         Z_PARAM_STRING(name, len1)
@@ -408,6 +418,12 @@ static PHP_METHOD(Vapor, addFolder)
     zval zv;
     ZVAL_STRING(&zv, resolved_path);
     zend_hash_str_update(vapor->folders, name, sizeof(name)-1, &zv);
+
+    zval arr;
+    array_init(&arr);
+    ZVAL_ARR(&arr, vapor->folders);
+    zend_update_property(vapor_ce, GetThis(), ZEND_STRL("folders"), &arr);
+    zval_ptr_dtor(&arr);
 }
 /* }}} */
 
@@ -773,10 +789,10 @@ PHP_MINIT_FUNCTION(vapor)
     vapor_ce         = zend_register_internal_class(&ce);
 
     memcpy(&vapor_object_handlers, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
-    vapor_object_handlers.offset   = XtOffsetOf(vapor_core, std);
-    vapor_object_handlers.free_obj = vapor_free_storage;
-    // vapor_object_handlers.read_property  = vapor_get_property;
-    // vapor_object_handlers.write_property = vapor_set_property;
+    vapor_object_handlers.offset         = XtOffsetOf(vapor_core, std);
+    vapor_object_handlers.free_obj       = vapor_free_storage;
+    vapor_object_handlers.read_property  = vapor_get_property;
+    vapor_object_handlers.write_property = vapor_set_property;
 
     return SUCCESS;
 }
