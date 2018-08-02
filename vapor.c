@@ -55,7 +55,8 @@ zend_class_entry *vapor_ce_exception;
 // PHP_INI_END()
 /* }}} */
 
-void vapor_report_error(vapor_core *obj, char *format, ...)
+/* {{{ void vapor_report_error(vapor_core *obj, char *format, ...) */
+static void vapor_report_error(vapor_core *obj, char *format, ...)
 {
     char *message;
     va_list arg;
@@ -72,9 +73,10 @@ void vapor_report_error(vapor_core *obj, char *format, ...)
 
     if (message) efree(message);
 }
+/* }}} */
 
 /* {{{ void vapor_free_storage(zend_object *obj) */
-void vapor_free_storage(zend_object *obj)
+static void vapor_free_storage(zend_object *obj)
 {
     vapor_core *vapor = php_vapor_fetch_object(obj);
 
@@ -98,6 +100,7 @@ void vapor_free_storage(zend_object *obj)
 }
 /* }}} */
 
+/* {{{ void vapor_prepare_template(vapor_core *vapor, vapor_template *tpl, char *tplname) */
 static void vapor_prepare_template(vapor_core *vapor, vapor_template *tpl, char *tplname)
 {
     char *folder = NULL, *basename = NULL, *remain = NULL;
@@ -133,18 +136,21 @@ static void vapor_prepare_template(vapor_core *vapor, vapor_template *tpl, char 
 
     efree(tplname);
 }
+/* }}} */
 
+/* {{{ void vapor_free_template(vapor_template *tpl) */
 static void vapor_free_template(vapor_template *tpl)
 {
     if (!tpl) return;
 
-    efree(tpl->folder);
-    efree(tpl->basename);
-    efree(tpl->filepath);
-    vapor_free_template(tpl->layout);
+    if (tpl->folder) efree(tpl->folder);
+    if (tpl->basename) efree(tpl->basename);
+    if (tpl->filepath) efree(tpl->filepath);
+    // vapor_free_template(tpl->layout);
 
     efree(tpl);
 }
+/* }}} */
 
 /* {{{ zend_object *vapor_new_object(zend_class_entry *ce) */
 static inline zend_object *vapor_new_object(zend_class_entry *ce)
@@ -345,14 +351,11 @@ static void vapor_run(vapor_core *vapor, vapor_template *tpl, zval *content)
         zval tmp;
         ZVAL_ZVAL(&tmp, content, 1, 0); // just COPY
         zend_hash_str_update(vapor->sections, "content", sizeof("content") - 1, &tmp);
-
         vapor_run(vapor, tpl->layout, content);
     }
 
-    efree(tpl->folder);
-    efree(tpl->basename);
-    efree(tpl->filepath);
-    efree(tpl);
+    php_printf("--> free template = %s::%s\n", tpl->folder, tpl->basename);
+    vapor_free_template(tpl);
 }
 /* }}} */
 
@@ -596,49 +599,44 @@ static PHP_METHOD(Vapor, section)
 /* {{{ proto void Vapor::insert(string filename, [] data) */
 static PHP_METHOD(Vapor, insert)
 {
-    // char *filename, *filename_copy, *folder = NULL, *basename = NULL, *filepath = NULL;
-    // size_t len;
-    // vapor_core *vapor;
-    // vapor_template *tpl;
-    // zend_array *data = NULL;
+    char *filename, *filename_copy;
+    size_t len;
+    vapor_core *vapor;
+    vapor_template *tpl;
+    zend_array *data = NULL;
 
-    // ZEND_PARSE_PARAMETERS_START(1, 2)
-    //     Z_PARAM_STRING(filename, len)
-    //     Z_PARAM_OPTIONAL
-    //     Z_PARAM_ARRAY_HT(data)
-    // ZEND_PARSE_PARAMETERS_END();
+    ZEND_PARSE_PARAMETERS_START(1, 2)
+        Z_PARAM_STRING(filename, len)
+        Z_PARAM_OPTIONAL
+        Z_PARAM_ARRAY_HT(data)
+    ZEND_PARSE_PARAMETERS_END();
 
-    // vapor = Z_VAPOR_P(GetThis());
+    vapor = Z_VAPOR_P(GetThis());
 
-    // filename_copy = estrdup(filename);
-    // vapor_split_filename(filename_copy, &folder, &basename);
+    // freed in vapor_run()
+    tpl   = emalloc(sizeof(vapor_template));
+    vapor = Z_VAPOR_P(GetThis());
+    vapor->current = tpl;
 
-    // if (!vapor_check_folder(vapor->folders, folder)) {
-    //     efree(filename_copy);
-    //     vapor_report_exception("Folder %s does not exists", folder);
-    // }
+    // freed in vapor_prepare_template()
+    filename_copy = estrdup(filename);
+    vapor_prepare_template(vapor, tpl, filename_copy);
 
-    // if (!vapor_filepath(vapor, folder, basename, &filepath)) {
-    //     efree(filename_copy);
-    //     zend_throw_exception_ex(vapor_ce_exception, 0, "Can't get filepath");
-    // }
+    if (UNEXPECTED(data != NULL)) {
+        vapor_copy_userdata(zend_rebuild_symbol_table(), data);
+    }
 
-    // if (UNEXPECTED(data != NULL)) {
-    //     vapor_copy_userdata(zend_rebuild_symbol_table(), data);
-    // }
+    // Run script
+    zval content;
+    ZVAL_UNDEF(&content);
+    vapor_execute(tpl, &content);
 
-    // tpl = vapor_new_template(vapor, folder, basename, filepath, 0);
+    // Free template
+    vapor_free_template(tpl);
 
-    // zval content;
-    // ZVAL_UNDEF(&content);
-    // vapor_execute(tpl, &content);
-
-    // efree(tpl->filepath);
-    // efree(tpl);
-    // efree(filename_copy);
-
-    // php_printf(Z_STRVAL_P(&content));
-    // zval_ptr_dtor(&content);
+    // Write output
+    php_output_write(Z_STRVAL(content), Z_STRLEN(content));
+    zval_ptr_dtor(&content);
 }
 /* }}} */
 
