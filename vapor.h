@@ -55,6 +55,7 @@ struct _vapor_core {
     zend_array      *functions;     //  24
     zend_array      *sections;      //  32
     vapor_template  *current;       //  40
+    zend_bool        exception;     //
     zend_object      std;           // 104
 };
 

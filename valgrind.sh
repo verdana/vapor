@@ -5,6 +5,8 @@ export USE_ZEND_ALLOC=0
 
 LOGFILE="`pwd`/valgrind.log"
 
+echo ----------------------------------------------------------------------
+
 cd ../vapor-demo
 valgrind                        \
     --leak-check=full           \
@@ -13,4 +15,5 @@ valgrind                        \
     --log-file=$LOGFILE         \
     /usr/local/bin/php          \
         -d extension=vapor.so   \
+        -d cli_server.color=on  \
     index.php
