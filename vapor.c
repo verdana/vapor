@@ -246,47 +246,6 @@ static void vapor_copy_userdata(zend_array *symtable, zend_array *data)
 }
 /* }}} */
 
-/* {{{ int vapor_check_folder(vapor_core *vapor, char *folder) */
-static inline int vapor_check_folder(vapor_core *vapor, char *folder)
-{
-    return !folder || (folder && zend_hash_str_exists(vapor->folders, folder, sizeof(folder) - 1));
-}
-/* }}} */
-
-/* {{{ int vapor_filepath(vapor_core *vapor, vapor_template *tpl) */
-static inline int vapor_filepath(vapor_core *vapor, vapor_template *tpl)
-{
-    char buf[MAXPATHLEN];
-
-    if (tpl->folder) {
-        zval *path;
-        if ((path = zend_hash_str_find(vapor->folders, tpl->folder, sizeof(tpl->folder) - 1))) {
-            slprintf(buf, sizeof(buf), "%s/%s.%s", Z_STRVAL_P(path), tpl->basename, vapor->extension);
-            tpl->filepath = estrdup(buf);
-            return 1;
-        }
-    } else {
-        slprintf(buf, sizeof(buf), "%s/%s.%s", vapor->basepath, tpl->basename, vapor->extension);
-        tpl->filepath = estrdup(buf);
-        return 1;
-    }
-
-    return 0;
-}
-/* }}} */
-
-/* {{{ vapor_template *vapor_new_template() */
-static vapor_template *vapor_new_template()
-{
-    vapor_template *tpl;
-
-    tpl = emalloc(sizeof(vapor_template));
-    memset(tpl, 0, sizeof(vapor_template));
-
-    return tpl;
-}
-/* }}} */
-
 /* {{{ void vapor_execute(vapor_template *tpl, zval *content) */
 static void vapor_execute(vapor_template *tpl, zval *content)
 {
