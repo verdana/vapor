@@ -177,7 +177,6 @@ static zval *vapor_get_property(zval *object, zval *member, int type, void **cac
     vapor_core *vapor;
     zval tmp_member;
     zval *retval = NULL;
-    // zend_object_handlers *std_handler;
 
     if (Z_TYPE_P(member) != IS_STRING) {
         tmp_member = *member;
@@ -186,9 +185,7 @@ static zval *vapor_get_property(zval *object, zval *member, int type, void **cac
         member = &tmp_member;
     }
 
-    // vapor       = Z_VAPOR_P(object);
-    // std_handler = zend_get_std_object_handlers();
-    retval      = std_object_handlers.read_property(object, member, type, cache_slot, rv);
+    retval = std_object_handlers.read_property(object, member, type, cache_slot, rv);
 
     if (member == &tmp_member) {
         zval_dtor(member);
