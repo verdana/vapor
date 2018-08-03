@@ -296,7 +296,7 @@ static void vapor_run(vapor_core *vapor, vapor_template *tpl, zval *content)
     // 所以再次使用 content 的时候，必须保证之前的内存已经被释放
     if (content) {
         zval_ptr_dtor(content);
-        ZVAL_NULL(content);
+        ZVAL_UNDEF(content);
     }
 
     // 执行 PHP 文件
@@ -307,10 +307,11 @@ static void vapor_run(vapor_core *vapor, vapor_template *tpl, zval *content)
         zval tmp;
         ZVAL_ZVAL(&tmp, content, 1, 0); // just COPY
         zend_hash_str_update(vapor->sections, "content", sizeof("content") - 1, &tmp);
+
+        vapor->current = tpl->layout;
         vapor_run(vapor, tpl->layout, content);
     }
 
-    php_printf("--> free template = %s::%s\n", tpl->folder, tpl->basename);
     vapor_free_template(tpl);
 }
 /* }}} */
