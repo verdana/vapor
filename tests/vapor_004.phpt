@@ -1,7 +1,10 @@
 --TEST--
 Check for vapor setExtension()
 --SKIPIF--
-<?php if (!extension_loaded("vapor")) print "skip"; ?>
+<?php if (!extension_loaded("vapor")) {
+    print "skip";
+}
+?>
 --FILE--
 <?php
 $v1 = new Vapor('/tmp');

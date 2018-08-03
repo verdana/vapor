@@ -1,7 +1,10 @@
 --TEST--
 Check for vapor addFolder()
 --SKIPIF--
-<?php if (!extension_loaded("vapor")) print "skip"; ?>
+<?php if (!extension_loaded("vapor")) {
+    print "skip";
+}
+?>
 --FILE--
 <?php
 // Prepare some folders
