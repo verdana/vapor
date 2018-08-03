@@ -414,27 +414,27 @@ static PHP_METHOD(Vapor, addFolder)
 {
     char *folder, *path;
     char resolved_path[MAXPATHLEN];
-    size_t len1, len2;
+    size_t folder_len, path_len;
     vapor_core *vapor;
     zend_bool fallback = 0;
 
     ZEND_PARSE_PARAMETERS_START(2, 2)
-        Z_PARAM_STRING(folder, len1)
-        Z_PARAM_STRING(path, len2)
+        Z_PARAM_STRING(folder, folder_len)
+        Z_PARAM_STRING(path, path_len)
         Z_PARAM_OPTIONAL
         Z_PARAM_BOOL(fallback)
     ZEND_PARSE_PARAMETERS_END();
 
     vapor = Z_VAPOR_P(GetThis());
 
-    if (!VCWD_REALPATH(path, resolved_path)) {
+    if (!path_len || !VCWD_REALPATH(path, resolved_path)) {
         vapor_report_error(vapor, "Could not resolve folder path");
         return;
     }
 
     zval zv;
     ZVAL_STRING(&zv, resolved_path);
-    zend_hash_str_update(vapor->folders, folder, sizeof(folder) - 1, &zv);
+    zend_hash_str_update(vapor->folders, folder, folder_len, &zv);
 }
 /* }}} */
 
