@@ -116,15 +116,23 @@ static int vapor_prepare_template(vapor_core *vapor, vapor_template *tpl, char *
 
     // Check if folder exists and build filepath
     if (folder) {
-        if (!zend_hash_str_exists(vapor->folders, folder, sizeof(folder) - 1)) {
+        if (!zend_hash_str_exists(vapor->folders, folder, strlen(folder))) {
             vapor_report_error(vapor, "Folder \"%s\" does not exists", folder);
             efree(tplname);
             return FAILURE;
         }
-        zval *path = zend_hash_str_find(vapor->folders, folder, sizeof(folder) - 1);
-        slprintf(path_buf, sizeof(path_buf), "%s/%s.%s", Z_STRVAL_P(path), basename, vapor->extension);
+        zval *path = zend_hash_str_find(vapor->folders, folder, strlen(folder));
+        if (vapor->extension) {
+            slprintf(path_buf, sizeof(path_buf), "%s/%s.%s", Z_STRVAL_P(path), basename, vapor->extension);
+        } else {
+            slprintf(path_buf, sizeof(path_buf), "%s/%s", Z_STRVAL_P(path), basename);
+        }
     } else {
-        slprintf(path_buf, sizeof(path_buf), "%s/%s.%s", vapor->basepath, basename, vapor->extension);
+        if (vapor->extension) {
+            slprintf(path_buf, sizeof(path_buf), "%s/%s.%s", vapor->basepath, basename, vapor->extension);
+        } else {
+            slprintf(path_buf, sizeof(path_buf), "%s/%s", vapor->basepath, basename);
+        }
     }
 
     // All members must be initialized
@@ -691,7 +699,6 @@ static PHP_METHOD(Vapor, render)
 
     // freed in vapor_prepare_template()
     tplname_copy = estrdup(tplname);
-
     if (SUCCESS == vapor_prepare_template(vapor, tpl, tplname_copy)) {
         if (EXPECTED(data != NULL)) {
             vapor_copy_userdata(zend_rebuild_symbol_table(), data);
