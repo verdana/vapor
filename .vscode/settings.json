@@ -26,5 +26,7 @@
         "**/missing": true,
         "**/mkinstalldirs": true,
         "**/modules/": true,
+        "**/tmp-php.ini": true,
+        "**/valgrind.log.core.*": true
     },
 }
