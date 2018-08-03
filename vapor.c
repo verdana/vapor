@@ -100,8 +100,8 @@ static void vapor_free_storage(zend_object *obj)
 }
 /* }}} */
 
-/* {{{ void vapor_prepare_template(vapor_core *vapor, vapor_template *tpl, char *tplname) */
-static void vapor_prepare_template(vapor_core *vapor, vapor_template *tpl, char *tplname)
+/* {{{ int vapor_prepare_template(vapor_core *vapor, vapor_template *tpl, char *tplname) */
+static int vapor_prepare_template(vapor_core *vapor, vapor_template *tpl, char *tplname)
 {
     char *folder = NULL, *basename = NULL, *remain = NULL;
     char path_buf[MAXPATHLEN];
@@ -119,8 +119,7 @@ static void vapor_prepare_template(vapor_core *vapor, vapor_template *tpl, char 
         if (!zend_hash_str_exists(vapor->folders, folder, sizeof(folder) - 1)) {
             vapor_report_error(vapor, "Folder \"%s\" does not exists", folder);
             efree(tplname);
-            efree(tpl);
-            return;
+            return FAILURE;
         }
         zval *path = zend_hash_str_find(vapor->folders, folder, sizeof(folder) - 1);
         slprintf(path_buf, sizeof(path_buf), "%s/%s.%s", Z_STRVAL_P(path), basename, vapor->extension);
@@ -129,12 +128,14 @@ static void vapor_prepare_template(vapor_core *vapor, vapor_template *tpl, char 
     }
 
     // All members must be initialized
+    tpl->ready    = 1;
     tpl->folder   = (folder != NULL) ? estrdup(folder) : NULL;
     tpl->basename = estrdup(basename);
     tpl->filepath = estrdup(path_buf);
     tpl->layout   = NULL;
 
     efree(tplname);
+    return SUCCESS;
 }
 /* }}} */
 
@@ -279,12 +280,22 @@ static void vapor_run(vapor_core *vapor, vapor_template *tpl, zval *content)
 {
     zend_stat_t statbuf;
 
-    if (!tpl->filepath || VCWD_STAT(tpl->filepath, &statbuf) != 0 || S_ISREG(statbuf.st_mode) == 0) {
+    // 检查模板结构体是否准备就绪
+    // tpl 的准备工作是有可能失败的
+    // 比如用户指定的 folder 或 filename 无效
+    if (tpl->ready != 1) {
+        vapor_free_template(tpl);
+        return;
+    }
+
+    // 检查模板文件路径是否正确
+    if (VCWD_STAT(tpl->filepath, &statbuf) != 0 || S_ISREG(statbuf.st_mode) == 0) {
         vapor_report_error(vapor, "Unable to load template file");
         vapor_free_template(tpl);
         return;
     }
 
+    // 检查模板文件是否被 open_basedir 限制
     if (php_check_open_basedir(tpl->filepath)) {
         vapor_report_error(vapor, "open_basedir restriction in effect, unable to open file");
         vapor_free_template(tpl);
@@ -519,15 +530,16 @@ static PHP_METHOD(Vapor, layout)
 
     // freed in vapor_run()
     tpl = emalloc(sizeof(vapor_template));
+    memset(tpl, 0, sizeof(vapor_template));
     vapor->current->layout = tpl;
 
     // freed in vapor_prepare_template()
     layout_copy = estrdup(layout);
-    vapor_prepare_template(vapor, tpl, layout_copy);
-
-    // copy data into symbol table
-    if (UNEXPECTED(data != NULL)) {
-        vapor_copy_userdata(zend_rebuild_symbol_table(), data);
+    if (SUCCESS == vapor_prepare_template(vapor, tpl, layout_copy)) {
+        // copy data into symbol table
+        if (UNEXPECTED(data != NULL)) {
+            vapor_copy_userdata(zend_rebuild_symbol_table(), data);
+        }
     }
 }
 /* }}} */
@@ -571,29 +583,34 @@ static PHP_METHOD(Vapor, insert)
     vapor = Z_VAPOR_P(GetThis());
 
     // freed in vapor_run()
-    tpl   = emalloc(sizeof(vapor_template));
+    tpl = emalloc(sizeof(vapor_template));
+    memset(tpl, 0, sizeof(vapor_template));
+
     vapor = Z_VAPOR_P(GetThis());
     vapor->current = tpl;
 
     // freed in vapor_prepare_template()
     filename_copy = estrdup(filename);
-    vapor_prepare_template(vapor, tpl, filename_copy);
+    if (SUCCESS == vapor_prepare_template(vapor, tpl, filename_copy)) {
+        if (UNEXPECTED(data != NULL)) {
+            vapor_copy_userdata(zend_rebuild_symbol_table(), data);
+        }
 
-    if (UNEXPECTED(data != NULL)) {
-        vapor_copy_userdata(zend_rebuild_symbol_table(), data);
+        // Run script
+        zval content;
+        ZVAL_UNDEF(&content);
+        vapor_execute(tpl, &content);
+
+        // Free template
+        vapor_free_template(tpl);
+
+        // Write output
+        php_output_write(Z_STRVAL(content), Z_STRLEN(content));
+        zval_ptr_dtor(&content);
+        return;
     }
 
-    // Run script
-    zval content;
-    ZVAL_UNDEF(&content);
-    vapor_execute(tpl, &content);
-
-    // Free template
     vapor_free_template(tpl);
-
-    // Write output
-    php_output_write(Z_STRVAL(content), Z_STRLEN(content));
-    zval_ptr_dtor(&content);
 }
 /* }}} */
 
@@ -671,22 +688,28 @@ static PHP_METHOD(Vapor, render)
 
     // freed in vapor_run()
     tpl   = emalloc(sizeof(vapor_template));
+    memset(tpl, 0, sizeof(vapor_template));
+
     vapor = Z_VAPOR_P(GetThis());
     vapor->current = tpl;
 
     // freed in vapor_prepare_template()
     tplname_copy = estrdup(tplname);
-    vapor_prepare_template(vapor, tpl, tplname_copy);
 
-    if (EXPECTED(data != NULL)) {
-        vapor_copy_userdata(zend_rebuild_symbol_table(), data);
+    if (SUCCESS == vapor_prepare_template(vapor, tpl, tplname_copy)) {
+        if (EXPECTED(data != NULL)) {
+            vapor_copy_userdata(zend_rebuild_symbol_table(), data);
+        }
+
+        zval content;
+        ZVAL_UNDEF(&content);
+        vapor_run(vapor, tpl, &content);
+
+        ZVAL_ZVAL(return_value, &content, 0, 1);
+        return;
     }
 
-    zval content;
-    ZVAL_UNDEF(&content);
-    vapor_run(vapor, tpl, &content);
-
-    ZVAL_ZVAL(return_value, &content, 0, 1);
+    vapor_free_template(tpl);
 }
 /* }}} */
 

@@ -60,6 +60,7 @@ struct _vapor_core {
 };
 
 struct _vapor_template {
+    zend_bool        ready;         //
     char            *folder;        //
     char            *basename;      //
     char            *filepath;      //
