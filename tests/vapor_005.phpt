@@ -7,7 +7,7 @@ Check for vapor render()
 ?>
 --FILE--
 <?php
-$v1 = new Vapor('/tmp');
+$v1 = new Vapor\Engine('/tmp');
 $fp = tmpfile();
 fwrite($fp, '<h1>The quick <?= $animal ?> jumped over the lazy dog.</h1>');
 $fname = basename(stream_get_meta_data($fp)['uri']);

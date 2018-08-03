@@ -7,7 +7,7 @@ Check for vapor setExtension()
 ?>
 --FILE--
 <?php
-$v1 = new Vapor('/tmp');
+$v1 = new Vapor\Engine('/tmp');
 var_dump($v1->extension);
 
 $v1->setExtension('php');

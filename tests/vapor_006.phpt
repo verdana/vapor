@@ -23,7 +23,7 @@ EOF;
 file_put_contents('/tmp/views/index.php', $index);
 
 // vapor
-$v1 = new Vapor('/tmp/views', 'php');
+$v1 = new Vapor\Engine('/tmp/views', 'php');
 $v1->addFolder('layout', '/tmp/views/layout');
 $content = $v1->render('index', ['animal' => 'brown fox']);
 var_dump($content);

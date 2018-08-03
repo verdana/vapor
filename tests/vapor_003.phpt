@@ -18,7 +18,7 @@ foreach ($dirs as $dir) {
 }
 
 // Start vapor
-$vapor = new Vapor('/tmp', 'php');
+$vapor = new Vapor\Engine('/tmp', 'php');
 $vapor->addFolder('layout', 'www/layout');
 $vapor->addFolder('shared', 'www/shared');
 $folders = $vapor->getFolders();

@@ -31,7 +31,7 @@ EOF;
 file_put_contents('/tmp/views/index.php', $index);
 
 // vapor
-$v1 = new Vapor('/tmp/views', 'php');
+$v1 = new Vapor\Engine('/tmp/views', 'php');
 $v1->addFolder('layout', '/tmp/views/layout');
 $v1->addFolder('shared', '/tmp/views/shared');
 $content = $v1->render('index', ['animal' => 'brown fox']);
