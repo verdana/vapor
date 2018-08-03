@@ -32,10 +32,14 @@
 #include "debug.h"
 #include "vapor.h"
 
-zend_object_handlers vapor_object_handlers;
-zend_class_entry *vapor_ce;
-zend_class_entry *vapor_ce_exception;
 //static int le_vapor;
+
+zend_class_entry *vapor_ce_engine;
+zend_class_entry *vapor_ce_template;
+zend_class_entry *vapor_ce_exception;
+
+static zend_object_handlers vapor_object_handlers_engine;
+static zend_object_handlers vapor_object_handlers_template;
 
 // ZEND_DECLARE_MODULE_GLOBALS(vapor)
 
@@ -55,8 +59,8 @@ zend_class_entry *vapor_ce_exception;
 // PHP_INI_END()
 /* }}} */
 
-/* {{{ void vapor_report_error(vapor_core *obj, char *format, ...) */
-static void vapor_report_error(vapor_core *obj, char *format, ...)
+/* {{{ void vapor_report_error(vapor_engine *obj, char *format, ...) */
+static void vapor_report_error(vapor_engine *obj, char *format, ...)
 {
     char *message;
     va_list arg;
@@ -78,7 +82,7 @@ static void vapor_report_error(vapor_core *obj, char *format, ...)
 /* {{{ void vapor_free_storage(zend_object *obj) */
 static void vapor_free_storage(zend_object *obj)
 {
-    vapor_core *vapor = php_vapor_fetch_object(obj);
+    vapor_engine *vapor = php_vapor_fetch_object(obj);
 
     if (vapor->basepath)  efree(vapor->basepath);
     if (vapor->extension) efree(vapor->extension);
@@ -100,8 +104,8 @@ static void vapor_free_storage(zend_object *obj)
 }
 /* }}} */
 
-/* {{{ int vapor_prepare_template(vapor_core *vapor, vapor_template *tpl, char *tplname) */
-static int vapor_prepare_template(vapor_core *vapor, vapor_template *tpl, char *tplname)
+/* {{{ int vapor_prepare_template(vapor_engine *vapor, vapor_template *tpl, char *tplname) */
+static int vapor_prepare_template(vapor_engine *vapor, vapor_template *tpl, char *tplname)
 {
     char *folder = NULL, *basename = NULL, *remain = NULL;
     char path_buf[MAXPATHLEN];
@@ -136,11 +140,11 @@ static int vapor_prepare_template(vapor_core *vapor, vapor_template *tpl, char *
     }
 
     // All members must be initialized
-    tpl->ready    = 1;
-    tpl->folder   = (folder != NULL) ? estrdup(folder) : NULL;
-    tpl->basename = estrdup(basename);
-    tpl->filepath = estrdup(path_buf);
-    tpl->layout   = NULL;
+    tpl->initialized = 1;
+    tpl->folder      = (folder != NULL) ? estrdup(folder) : NULL;
+    tpl->basename    = estrdup(basename);
+    tpl->filepath    = estrdup(path_buf);
+    tpl->layout      = NULL;
 
     efree(tplname);
     return SUCCESS;
@@ -160,25 +164,40 @@ static void vapor_free_template(vapor_template *tpl)
 }
 /* }}} */
 
-/* {{{ zend_object *vapor_new_object(zend_class_entry *ce) */
-static inline zend_object *vapor_new_object(zend_class_entry *ce)
+/* {{{ zend_object *vapor_object_new_engine(zend_class_entry *ce) */
+static inline zend_object *vapor_object_new_engine(zend_class_entry *ce)
 {
-    vapor_core *vapor;
+    vapor_engine *vapor;
 
-    vapor = ecalloc(1, sizeof(vapor_core) + zend_object_properties_size(ce));
+    vapor = ecalloc(1, sizeof(vapor_engine) + zend_object_properties_size(ce));
 
     zend_object_std_init(&vapor->std, ce);
     object_properties_init(&vapor->std, ce);
-    vapor->std.handlers = &vapor_object_handlers;
+    vapor->std.handlers = &vapor_object_handlers_engine;
 
     return &vapor->std;
+}
+/* }}} */
+
+/* {{{ zend_object *vapor_object_new_template(zend_class_entry *ce) */
+static inline zend_object *vapor_object_new_template(zend_class_entry *ce)
+{
+    vapor_template *template;
+
+    template = ecalloc(1, sizeof(vapor_template) + zend_object_properties_size(ce));
+
+    zend_object_std_init(&template->std, ce);
+    object_properties_init(&template->std, ce);
+    template->std.handlers = &vapor_object_handlers_template;
+
+    return &template->std;
 }
 /* }}} */
 
 /* {{{ void vapor_set_property(zval *object, zval *key, zval *value, void **cache_slot) */
 static void vapor_set_property(zval *object, zval *key, zval *value, void **cache_slot)
 {
-    vapor_core *vapor = Z_VAPOR_P(object);
+    vapor_engine *vapor = Z_VAPOR_P(object);
     convert_to_string(key);
 
     std_object_handlers.write_property(object, key, value, cache_slot);
@@ -188,7 +207,7 @@ static void vapor_set_property(zval *object, zval *key, zval *value, void **cach
 /* {{{ zval *vapor_get_property(zval *object, zval *member, int type, void **cache_slot, zval *rv) */
 static zval *vapor_get_property(zval *object, zval *member, int type, void **cache_slot, zval *rv)
 {
-    vapor_core *vapor;
+    vapor_engine *vapor;
     zval tmp_member;
     zval *retval = NULL;
 
@@ -212,7 +231,7 @@ static zval *vapor_get_property(zval *object, zval *member, int type, void **cac
 /* {{{ void vapor_unset_property(zval *object, zval *key, void **cache_slot) */
 static void vapor_unset_property(zval *object, zval *key, void **cache_slot)
 {
-    vapor_core *vapor = Z_VAPOR_P(object);
+    vapor_engine *vapor = Z_VAPOR_P(object);
     convert_to_string(key);
 
     std_object_handlers.unset_property(object, key, cache_slot);
@@ -222,7 +241,7 @@ static void vapor_unset_property(zval *object, zval *key, void **cache_slot)
 /* {{{ int vapor_get_callback(INTERNAL_FUNCTION_PARAMETERS, char *func_name, zval **callback) */
 static int vapor_get_callback(INTERNAL_FUNCTION_PARAMETERS, char *func_name, zval **callback)
 {
-    vapor_core *vapor = Z_VAPOR_P(GetThis());
+    vapor_engine *vapor = Z_VAPOR_P(GetThis());
 
     if ((*callback = zend_hash_str_find(vapor->functions, func_name, strlen(func_name))) != NULL) {
         if (zend_is_callable(*callback, 0, 0)) {
@@ -281,15 +300,15 @@ static void vapor_execute(vapor_template *tpl, zval *content)
 }
 /* }}} */
 
-/* {{{ void vapor_run(vapor_core *vapor, vapor_template *tpl, zval *content) */
-static void vapor_run(vapor_core *vapor, vapor_template *tpl, zval *content)
+/* {{{ void vapor_run(vapor_engine *vapor, vapor_template *tpl, zval *content) */
+static void vapor_run(vapor_engine *vapor, vapor_template *tpl, zval *content)
 {
     zend_stat_t statbuf;
 
     // 检查模板结构体是否准备就绪
     // tpl 的准备工作是有可能失败的
     // 比如用户指定的 folder 或 filename 无效
-    if (tpl->ready != 1) {
+    if (tpl->initialized != 1) {
         vapor_free_template(tpl);
         return;
     }
@@ -338,7 +357,7 @@ static PHP_METHOD(Vapor, __construct)
 {
     char *path, *ext = NULL, resolved_path[MAXPATHLEN];
     size_t path_len, ext_len;
-    vapor_core *vapor;
+    vapor_engine *vapor;
 
     ZEND_PARSE_PARAMETERS_START(1, 2)
         Z_PARAM_STRING(path, path_len)
@@ -364,9 +383,9 @@ static PHP_METHOD(Vapor, __construct)
     zend_hash_init(vapor->sections, 0, NULL, ZVAL_PTR_DTOR, 0);
     zend_hash_init(vapor->functions, 0, NULL, ZVAL_PTR_DTOR, 0);
 
-    zend_update_property_string(vapor_ce, GetThis(), "basepath", sizeof("basepath") - 1, vapor->basepath);
+    zend_update_property_string(vapor_ce_engine, GetThis(), "basepath", sizeof("basepath") - 1, vapor->basepath);
     if (vapor->extension) {
-        zend_update_property_string(vapor_ce, GetThis(), "extension", sizeof("extension") - 1, vapor->extension);
+        zend_update_property_string(vapor_ce_engine, GetThis(), "extension", sizeof("extension") - 1, vapor->extension);
     }
 }
 /* }}} */
@@ -423,7 +442,7 @@ static PHP_METHOD(Vapor, addFolder)
     char *folder, *path;
     char resolved_path[MAXPATHLEN];
     size_t folder_len, path_len;
-    vapor_core *vapor;
+    vapor_engine *vapor;
     zend_bool fallback = 0;
 
     ZEND_PARSE_PARAMETERS_START(2, 2)
@@ -449,7 +468,7 @@ static PHP_METHOD(Vapor, addFolder)
 /* {{{ proto array Vapor::getFolders() */
 static PHP_METHOD(Vapor, getFolders)
 {
-    vapor_core *vapor = Z_VAPOR_P(GetThis());
+    vapor_engine *vapor = Z_VAPOR_P(GetThis());
     RETURN_ARR(zend_array_dup(vapor->folders));
 }
 /* }}} */
@@ -459,7 +478,7 @@ static PHP_METHOD(Vapor, setExtension)
 {
     char *ext;
     size_t ext_len;
-    vapor_core *vapor;
+    vapor_engine *vapor;
 
     ZEND_PARSE_PARAMETERS_START(1, 1)
         Z_PARAM_STRING(ext, ext_len)
@@ -469,7 +488,7 @@ static PHP_METHOD(Vapor, setExtension)
     if (vapor->extension) efree(vapor->extension);
     vapor->extension = estrdup(ext);
 
-    zend_update_property_string(vapor_ce, GetThis(), ZEND_STRL("extension"), vapor->extension);
+    zend_update_property_string(vapor_ce_engine, GetThis(), ZEND_STRL("extension"), vapor->extension);
 }
 /* }}} */
 
@@ -478,7 +497,7 @@ static PHP_METHOD(Vapor, registerFunction)
 {
     char *name;
     size_t len;
-    vapor_core *vapor;
+    vapor_engine *vapor;
     zval *func, tmp;
 
     ZEND_PARSE_PARAMETERS_START(2, 2)
@@ -505,7 +524,7 @@ static PHP_METHOD(Vapor, path)
         Z_PARAM_STRING(filename, len)
     ZEND_PARSE_PARAMETERS_END();
 
-    vapor_core *vapor = Z_VAPOR_P(GetThis());
+    vapor_engine *vapor = Z_VAPOR_P(GetThis());
     php_printf(vapor->current->filepath);
 }
 /* }}} */
@@ -515,7 +534,7 @@ static PHP_METHOD(Vapor, layout)
 {
     char *layout, *layout_copy;
     size_t len;
-    vapor_core *vapor;
+    vapor_engine *vapor;
     vapor_template *tpl;
     zend_array *data = NULL;
 
@@ -553,7 +572,7 @@ static PHP_METHOD(Vapor, section)
 {
     char *content, *section;
     size_t len;
-    vapor_core *vapor;
+    vapor_engine *vapor;
     zval *tmp;
 
     ZEND_PARSE_PARAMETERS_START(1, 1)
@@ -574,7 +593,7 @@ static PHP_METHOD(Vapor, insert)
 {
     char *filename, *filename_copy;
     size_t len;
-    vapor_core *vapor;
+    vapor_engine *vapor;
     vapor_template *tpl;
     zend_array *data = NULL;
 
@@ -680,7 +699,7 @@ static PHP_METHOD(Vapor, render)
 {
     char *tplname, *tplname_copy;
     size_t len;
-    vapor_core *vapor;
+    vapor_engine *vapor;
     vapor_template *tpl;
     zend_array *data = NULL;
 
@@ -771,14 +790,8 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_render, 0, 0, 1)
 ZEND_END_ARG_INFO()
 /* }}} */
 
-/* {{{ vapor_methods[] : VaporException class */
-static const zend_function_entry vapor_exception_methods[] = {
-    PHP_FE_END
-};
-/* }}} */
-
-/* {{{ vapor_methods[] : Vapor class */
-static const zend_function_entry vapor_methods[] = {
+/* {{{ vapor_methods_engine[] : Vapor\Engine class */
+static const zend_function_entry vapor_methods_engine[] = {
     PHP_ME(Vapor,       __construct,        arginfo__construct,     ZEND_ACC_PUBLIC | ZEND_ACC_CTOR)
     PHP_ME(Vapor,       __call,             arginfo__call,          ZEND_ACC_PUBLIC | ZEND_ACC_FINAL)
     PHP_ME(Vapor,       addFolder,          arginfo_add_folder,     ZEND_ACC_PUBLIC)
@@ -796,31 +809,49 @@ static const zend_function_entry vapor_methods[] = {
 };
 /* }}} */
 
+/* {{{ vapor_methods_template[] : Vapor\Template class */
+static const zend_function_entry vapor_methods_template[] = {
+    PHP_FE_END
+};
+/* }}} */
+
+/* {{{ vapor_methods_exception[] : Vapor\Exception class */
+static const zend_function_entry vapor_methods_exception[] = {
+    PHP_FE_END
+};
+/* }}} */
+
 /* {{{ PHP_MINIT_FUNCTION */
 PHP_MINIT_FUNCTION(vapor)
 {
-    zend_class_entry ce;
+    zend_class_entry ce_engine, ce_template, ce_exception;
 
     // register resource dtor
     // le_vapor = zend_register_list_destructors_ex(vapor_resource_dtor, NULL, "Vapor Template", module_number);
 
     // REGISTER_INI_ENTRIES();
 
-    INIT_NS_CLASS_ENTRY(ce, "Vapor", "Exception", vapor_exception_methods);
-    vapor_ce_exception = zend_register_internal_class_ex(&ce, zend_ce_exception);
+    // Class Vapor/Engine
+    INIT_NS_CLASS_ENTRY(ce_engine, "Vapor", "Engine", vapor_methods_engine);
+    ce_engine.create_object = vapor_object_new_engine;
+    vapor_ce_engine = zend_register_internal_class(&ce_engine);
+    memcpy(&vapor_object_handlers_engine, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
+    vapor_object_handlers_engine.offset         = XtOffsetOf(vapor_engine, std);
+    vapor_object_handlers_engine.free_obj       = vapor_free_storage;
+    vapor_object_handlers_engine.read_property  = vapor_get_property;
+    vapor_object_handlers_engine.write_property = vapor_set_property;
+    zend_declare_property_null(vapor_ce_engine, ZEND_STRL("basepath"), ZEND_ACC_PUBLIC);
+    zend_declare_property_null(vapor_ce_engine, ZEND_STRL("extension"), ZEND_ACC_PUBLIC);
 
-    INIT_NS_CLASS_ENTRY(ce, "Vapor", "Engine", vapor_methods);
-    ce.create_object = vapor_new_object;
-    vapor_ce         = zend_register_internal_class(&ce);
+    // Class Vapor/Template
+    INIT_NS_CLASS_ENTRY(ce_template, "Vapor", "Template", vapor_methods_template);
+    ce_template.create_object = vapor_object_new_template;
+    vapor_ce_template = zend_register_internal_class(&ce_template);
+    memcpy(&vapor_object_handlers_template, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
 
-    zend_declare_property_null(vapor_ce, ZEND_STRL("basepath"), ZEND_ACC_PUBLIC);
-    zend_declare_property_null(vapor_ce, ZEND_STRL("extension"), ZEND_ACC_PUBLIC);
-
-    memcpy(&vapor_object_handlers, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
-    vapor_object_handlers.offset         = XtOffsetOf(vapor_core, std);
-    vapor_object_handlers.free_obj       = vapor_free_storage;
-    vapor_object_handlers.read_property  = vapor_get_property;
-    vapor_object_handlers.write_property = vapor_set_property;
+    // Class Vapor/Exception
+    INIT_NS_CLASS_ENTRY(ce_exception, "Vapor", "Exception", vapor_methods_exception);
+    vapor_ce_exception = zend_register_internal_class_ex(&ce_exception, zend_ce_exception);
 
     return SUCCESS;
 }

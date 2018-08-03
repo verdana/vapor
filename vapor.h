@@ -45,10 +45,10 @@ ZEND_TSRMLS_CACHE_EXTERN()
 #define VAPOR_MAX_SECTIONS      256
 #define VAPOR_MAX_FUNCTIONS     256
 
-typedef struct _vapor_core      vapor_core;
+typedef struct _vapor_engine    vapor_engine;
 typedef struct _vapor_template  vapor_template;
 
-struct _vapor_core {
+struct _vapor_engine {
     char            *basepath;      //   0
     char            *extension;     //   8
     zend_array      *folders;       //  16
@@ -60,16 +60,17 @@ struct _vapor_core {
 };
 
 struct _vapor_template {
-    zend_bool        ready;         //
+    zend_bool        initialized;   //
     char            *folder;        //
     char            *basename;      //
     char            *filepath;      //
     vapor_template  *layout;        //
+    zend_object      std;
 };
 
-static inline vapor_core *php_vapor_fetch_object(zend_object *obj)
+static inline vapor_engine *php_vapor_fetch_object(zend_object *obj)
 {
-    return (vapor_core *)((char *)(obj)-XtOffsetOf(vapor_core, std));
+    return (vapor_engine *)((char *)(obj)-XtOffsetOf(vapor_engine, std));
 }
 #define Z_VAPOR_P(zv) php_vapor_fetch_object(Z_OBJ_P(zv))
 #define GetThis() ((Z_TYPE(EX(This)) == IS_OBJECT) ? &EX(This) : NULL)
