@@ -1,5 +1,5 @@
 --TEST--
-Check for vapor addFolder
+Check for vapor addFolder()
 --SKIPIF--
 <?php if (!extension_loaded("vapor")) print "skip"; ?>
 --FILE--
