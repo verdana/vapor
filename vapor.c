@@ -349,10 +349,11 @@ static PHP_METHOD(Vapor, __construct)
     vapor->extension = (ext) ? estrdup(ext): NULL;
 
     ALLOC_HASHTABLE(vapor->folders);
-    zend_hash_init(vapor->folders, 0, NULL, ZVAL_PTR_DTOR, 0);
     ALLOC_HASHTABLE(vapor->sections);
-    zend_hash_init(vapor->sections, 0, NULL, ZVAL_PTR_DTOR, 0);
     ALLOC_HASHTABLE(vapor->functions);
+
+    zend_hash_init(vapor->folders, 0, NULL, ZVAL_PTR_DTOR, 0);
+    zend_hash_init(vapor->sections, 0, NULL, ZVAL_PTR_DTOR, 0);
     zend_hash_init(vapor->functions, 0, NULL, ZVAL_PTR_DTOR, 0);
 
     zend_update_property_string(vapor_ce, GetThis(), "basepath", sizeof("basepath") - 1, vapor->basepath);
@@ -804,6 +805,9 @@ PHP_MINIT_FUNCTION(vapor)
     INIT_CLASS_ENTRY(ce, "Vapor", vapor_methods);
     ce.create_object = vapor_new_object;
     vapor_ce         = zend_register_internal_class(&ce);
+
+    zend_declare_property_null(vapor_ce, ZEND_STRL("basepath"), ZEND_ACC_PUBLIC);
+    zend_declare_property_null(vapor_ce, ZEND_STRL("extension"), ZEND_ACC_PUBLIC);
 
     memcpy(&vapor_object_handlers, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
     vapor_object_handlers.offset         = XtOffsetOf(vapor_core, std);
