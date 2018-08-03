@@ -785,7 +785,7 @@ static const zend_function_entry vapor_methods[] = {
     PHP_ME(Vapor,       getFolders,         NULL,                   ZEND_ACC_PUBLIC)
     PHP_ME(Vapor,       setExtension,       arginfo_set_extension,  ZEND_ACC_PUBLIC)
     PHP_ME(Vapor,       registerFunction,   arginfo_register_func,  ZEND_ACC_PUBLIC)
-    PHP_ME(Vapor,       path,               NULL,                   ZEND_ACC_PUBLIC)
+    PHP_ME(Vapor,       path,               arginfo_path,           ZEND_ACC_PUBLIC)
     PHP_ME(Vapor,       layout,             arginfo_layout,         ZEND_ACC_PUBLIC)
     PHP_ME(Vapor,       section,            arginfo_section,        ZEND_ACC_PUBLIC)
     PHP_ME(Vapor,       insert,             arginfo_insert,         ZEND_ACC_PUBLIC)
