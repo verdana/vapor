@@ -147,7 +147,6 @@ static void vapor_free_template(vapor_template *tpl)
     if (tpl->folder) efree(tpl->folder);
     if (tpl->basename) efree(tpl->basename);
     if (tpl->filepath) efree(tpl->filepath);
-    // vapor_free_template(tpl->layout);
 
     efree(tpl);
 }
@@ -219,10 +218,10 @@ static int vapor_get_callback(INTERNAL_FUNCTION_PARAMETERS, char *func_name, zva
 
     if ((*callback = zend_hash_str_find(vapor->functions, func_name, strlen(func_name))) != NULL) {
         if (zend_is_callable(*callback, 0, 0)) {
-            return 1;
+            return SUCCESS;
         }
     }
-    return 0;
+    return FAILURE;
 }
 /* }}} */
 
@@ -239,8 +238,7 @@ static void vapor_copy_userdata(zend_array *symtable, zend_array *data)
     ZEND_HASH_FOREACH_STR_KEY_VAL(data, key, val) {
         Z_TRY_ADDREF_P(val);
         zend_hash_str_update(symtable, ZSTR_VAL(key), ZSTR_LEN(key), val);
-    }
-    ZEND_HASH_FOREACH_END();
+    } ZEND_HASH_FOREACH_END();
 }
 /* }}} */
 
@@ -344,26 +342,23 @@ static PHP_METHOD(Vapor, __construct)
 
     if (!VCWD_REALPATH(path, resolved_path)) {
         vapor_report_error(vapor, "Could not resolve file path");
+        return;
     }
 
     vapor->basepath  = estrdup(resolved_path);
     vapor->extension = (ext) ? estrdup(ext): NULL;
 
-    if (!vapor->folders) {
-        ALLOC_HASHTABLE(vapor->folders);
-        zend_hash_init(vapor->folders, 0, NULL, ZVAL_PTR_DTOR, 0);
-    }
-    if (!vapor->sections) {
-        ALLOC_HASHTABLE(vapor->sections);
-        zend_hash_init(vapor->sections, 0, NULL, ZVAL_PTR_DTOR, 0);
-    }
-    if (!vapor->functions) {
-        ALLOC_HASHTABLE(vapor->functions);
-        zend_hash_init(vapor->functions, 0, NULL, ZVAL_PTR_DTOR, 0);
-    }
+    ALLOC_HASHTABLE(vapor->folders);
+    zend_hash_init(vapor->folders, 0, NULL, ZVAL_PTR_DTOR, 0);
+    ALLOC_HASHTABLE(vapor->sections);
+    zend_hash_init(vapor->sections, 0, NULL, ZVAL_PTR_DTOR, 0);
+    ALLOC_HASHTABLE(vapor->functions);
+    zend_hash_init(vapor->functions, 0, NULL, ZVAL_PTR_DTOR, 0);
 
     zend_update_property_string(vapor_ce, GetThis(), "basepath", sizeof("basepath") - 1, vapor->basepath);
-    zend_update_property_string(vapor_ce, GetThis(), "extension", sizeof("extension") - 1, vapor->extension);
+    if (vapor->extension) {
+        zend_update_property_string(vapor_ce, GetThis(), "extension", sizeof("extension") - 1, vapor->extension);
+    }
 }
 /* }}} */
 
@@ -389,7 +384,7 @@ static PHP_METHOD(Vapor, __call)
         argc++;
     } ZEND_HASH_FOREACH_END();
 
-    if (vapor_get_callback(INTERNAL_FUNCTION_PARAM_PASSTHRU, function, &callback)) {
+    if (SUCCESS == vapor_get_callback(INTERNAL_FUNCTION_PARAM_PASSTHRU, function, &callback)) {
         zend_fcall_info fci;
         zend_fcall_info_cache fcc;
         zval retval;
@@ -640,7 +635,7 @@ static PHP_METHOD(Vapor, escape)
             zval *funcname;
             ZEND_HASH_FOREACH_VAL (Z_ARRVAL(used_callbacks), funcname) {
                 zval *callback;
-                if (vapor_get_callback(INTERNAL_FUNCTION_PARAM_PASSTHRU, Z_STRVAL_P(funcname), &callback)) {
+                if (SUCCESS == vapor_get_callback(INTERNAL_FUNCTION_PARAM_PASSTHRU, Z_STRVAL_P(funcname), &callback)) {
                     zend_fcall_info fci;
                     zend_fcall_info_cache fcc;
                     zval argv[1], retval;
