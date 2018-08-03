@@ -773,7 +773,7 @@ ZEND_END_ARG_INFO()
 
 /* {{{ vapor_methods[] : VaporException class */
 static const zend_function_entry vapor_exception_methods[] = {
-	PHP_FE_END
+    PHP_FE_END
 };
 /* }}} */
 
@@ -807,7 +807,7 @@ PHP_MINIT_FUNCTION(vapor)
     // REGISTER_INI_ENTRIES();
 
     INIT_CLASS_ENTRY(ce, "VaporException", vapor_exception_methods);
-	vapor_ce_exception = zend_register_internal_class_ex(&ce, zend_ce_exception);
+    vapor_ce_exception = zend_register_internal_class_ex(&ce, zend_ce_exception);
 
     INIT_CLASS_ENTRY(ce, "Vapor", vapor_methods);
     ce.create_object = vapor_new_object;
