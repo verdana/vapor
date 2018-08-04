@@ -59,6 +59,10 @@ static zend_object_handlers vapor_object_handlers_template;
 // PHP_INI_END()
 /* }}} */
 
+
+#define VAPOR_ENGINE_GET_OBJ \
+    vapor_engine *vapor = Z_VAPOR_ENGINE_P(getThis());
+
 /* {{{ void vapor_report_error(vapor_engine *obj, char *format, ...) */
 static void vapor_report_error(vapor_engine *obj, char *format, ...)
 {
@@ -241,7 +245,7 @@ static void vapor_unset_property(zval *object, zval *key, void **cache_slot)
 /* {{{ int vapor_get_callback(INTERNAL_FUNCTION_PARAMETERS, char *func_name, zval **callback) */
 static int vapor_get_callback(INTERNAL_FUNCTION_PARAMETERS, char *func_name, zval **callback)
 {
-    vapor_engine *vapor = Z_VAPOR_ENGINE_P(GetThis());
+    VAPOR_ENGINE_GET_OBJ;
 
     if ((*callback = zend_hash_str_find(vapor->functions, func_name, strlen(func_name))) != NULL) {
         if (zend_is_callable(*callback, 0, 0)) {
@@ -442,7 +446,6 @@ static PHP_METHOD(Vapor, addFolder)
     char *folder, *path;
     char resolved_path[MAXPATHLEN];
     size_t folder_len, path_len;
-    vapor_engine *vapor;
     zend_bool fallback = 0;
 
     ZEND_PARSE_PARAMETERS_START(2, 2)
@@ -452,7 +455,7 @@ static PHP_METHOD(Vapor, addFolder)
         Z_PARAM_BOOL(fallback)
     ZEND_PARSE_PARAMETERS_END();
 
-    vapor = Z_VAPOR_ENGINE_P(GetThis());
+    VAPOR_ENGINE_GET_OBJ;
 
     if (!path_len || !VCWD_REALPATH(path, resolved_path)) {
         vapor_report_error(vapor, "Could not resolve folder path");
@@ -468,7 +471,7 @@ static PHP_METHOD(Vapor, addFolder)
 /* {{{ proto array Vapor::getFolders() */
 static PHP_METHOD(Vapor, getFolders)
 {
-    vapor_engine *vapor = Z_VAPOR_ENGINE_P(GetThis());
+    VAPOR_ENGINE_GET_OBJ;
     RETURN_ARR(zend_array_dup(vapor->folders));
 }
 /* }}} */
@@ -478,13 +481,13 @@ static PHP_METHOD(Vapor, setExtension)
 {
     char *ext;
     size_t ext_len;
-    vapor_engine *vapor;
 
     ZEND_PARSE_PARAMETERS_START(1, 1)
         Z_PARAM_STRING(ext, ext_len)
     ZEND_PARSE_PARAMETERS_END();
 
-    vapor = Z_VAPOR_ENGINE_P(GetThis());
+    VAPOR_ENGINE_GET_OBJ;
+
     if (vapor->extension) efree(vapor->extension);
     vapor->extension = estrdup(ext);
 
@@ -497,7 +500,6 @@ static PHP_METHOD(Vapor, registerFunction)
 {
     char *name;
     size_t len;
-    vapor_engine *vapor;
     zval *func, tmp;
 
     ZEND_PARSE_PARAMETERS_START(2, 2)
@@ -505,10 +507,10 @@ static PHP_METHOD(Vapor, registerFunction)
         Z_PARAM_ZVAL(func)
     ZEND_PARSE_PARAMETERS_END();
 
+    VAPOR_ENGINE_GET_OBJ;
+
     tmp = *func;
     zval_copy_ctor(&tmp);
-
-    vapor = Z_VAPOR_ENGINE_P(GetThis());
     zend_hash_str_update(vapor->functions, name, len, &tmp);
 }
 /* }}} */
@@ -534,7 +536,6 @@ static PHP_METHOD(Vapor, layout)
 {
     char *layout, *layout_copy;
     size_t len;
-    vapor_engine *vapor;
     vapor_template *tpl;
     zend_array *data = NULL;
 
@@ -544,7 +545,7 @@ static PHP_METHOD(Vapor, layout)
         Z_PARAM_ARRAY_HT(data)
     ZEND_PARSE_PARAMETERS_END();
 
-    vapor = Z_VAPOR_ENGINE_P(GetThis());
+    VAPOR_ENGINE_GET_OBJ;
 
     if (UNEXPECTED(vapor->current == NULL)) {
         vapor_report_error(vapor, "Failed to set layout");
@@ -572,14 +573,13 @@ static PHP_METHOD(Vapor, section)
 {
     char *content, *section;
     size_t len;
-    vapor_engine *vapor;
     zval *tmp;
 
     ZEND_PARSE_PARAMETERS_START(1, 1)
         Z_PARAM_STRING(section, len)
     ZEND_PARSE_PARAMETERS_END();
 
-    vapor = Z_VAPOR_ENGINE_P(GetThis());
+    VAPOR_ENGINE_GET_OBJ;
 
     if (NULL != (tmp = zend_hash_str_find(vapor->sections, section, len)) && Z_TYPE_P(tmp) == IS_STRING) {
         RETURN_STRING(Z_STRVAL_P(tmp));
@@ -593,7 +593,6 @@ static PHP_METHOD(Vapor, insert)
 {
     char *filename, *filename_copy;
     size_t len;
-    vapor_engine *vapor;
     vapor_template *tpl;
     zend_array *data = NULL;
 
@@ -603,13 +602,11 @@ static PHP_METHOD(Vapor, insert)
         Z_PARAM_ARRAY_HT(data)
     ZEND_PARSE_PARAMETERS_END();
 
-    vapor = Z_VAPOR_ENGINE_P(GetThis());
+    VAPOR_ENGINE_GET_OBJ;
 
     // freed in vapor_run()
     tpl = emalloc(sizeof(vapor_template));
     memset(tpl, 0, sizeof(vapor_template));
-
-    vapor = Z_VAPOR_ENGINE_P(GetThis());
     vapor->current = tpl;
 
     // freed in vapor_prepare_template()
@@ -699,7 +696,6 @@ static PHP_METHOD(Vapor, render)
 {
     char *tplname, *tplname_copy;
     size_t len;
-    vapor_engine *vapor;
     vapor_template *tpl;
     zend_array *data = NULL;
 
@@ -713,7 +709,7 @@ static PHP_METHOD(Vapor, render)
     tpl   = emalloc(sizeof(vapor_template));
     memset(tpl, 0, sizeof(vapor_template));
 
-    vapor = Z_VAPOR_ENGINE_P(GetThis());
+    VAPOR_ENGINE_GET_OBJ;
     vapor->current = tpl;
 
     // freed in vapor_prepare_template()
