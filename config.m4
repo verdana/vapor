@@ -7,7 +7,7 @@ PHP_ARG_ENABLE(vapor-debug, whether to enable debugging support in vapor,
 [  --enable-vapor-debug    Enable debugging support in vapor])
 
 if test "$PHP_VAPOR" != "no"; then
-    vapor_source="vapor.c debug.c"
+    vapor_source="debug.c template.c vapor.c"
 
     dnl Check whether to enable debugging
     if test "$PHP_VAPOR_DEBUG" != "no"; then
