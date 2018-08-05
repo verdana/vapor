@@ -24,10 +24,6 @@
 
 #define VAPOR_TEMPLATE_GET_OBJ vapor_template *vapor = Z_VAPOR_TEMPLATE_P(getThis());
 
-static const zend_function_entry vapor_methods_template[] = {
-    PHP_FE_END
-};
-
 static zend_object *vapor_object_new_template(zend_class_entry *ce)
 {
     vapor_template *template;
@@ -72,6 +68,39 @@ static void vapor_object_set_property_template(zval *object, zval *key, zval *va
 {
 }
 
+
+PHP_METHOD(Template, __construct)
+{
+    char *filename;
+    size_t len;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(filename, len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    php_printf("template = %s\n", filename);
+}
+
+PHP_METHOD(Template, make)
+{
+
+}
+
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo__construct, 0, 0, 1)
+    ZEND_ARG_INFO(0, path)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_make, 0, 0, 1)
+    ZEND_ARG_INFO(0, path)
+ZEND_END_ARG_INFO()
+
+const zend_function_entry vapor_methods_template[] = {
+    PHP_ME(Template,       __construct,         arginfo__construct,     ZEND_ACC_PUBLIC | ZEND_ACC_CTOR)
+    PHP_ME(Template,       make,                arginfo_make,           ZEND_ACC_PUBLIC)
+    PHP_FE_END
+};
+
 void vapor_template_init()
 {
     zend_class_entry ce_template;
@@ -87,29 +116,3 @@ void vapor_template_init()
     vapor_object_handlers_template.write_property = vapor_object_set_property_template;
 }
 
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo__construct, 0, 0, 1)
-    ZEND_ARG_INFO(0, path)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_make, 0, 0, 1)
-    ZEND_ARG_INFO(0, path)
-ZEND_END_ARG_INFO()
-
-
-static PHP_METHOD(Template, __construct)
-{
-    char *filename;
-    size_t len;
-
-    ZEND_PARSE_PARAMETERS_START(1, 1)
-        Z_PARAM_STRING(filename, len)
-    ZEND_PARSE_PARAMETERS_END();
-
-    php_printf("template = %s\n", filename);
-}
-
-static PHP_METHOD(Template, make)
-{
-
-}
