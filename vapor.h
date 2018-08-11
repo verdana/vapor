@@ -64,11 +64,11 @@ struct _vapor_template {
     char            *folder;        //
     char            *basename;      //
     char            *filepath;      //
-    vapor_template  *layout;        //
+    char            *layout;        //
+    zend_array      *layout_data;   //
+    vapor_engine    *engine;
     zend_object      std;
 };
-
-#define GetThis() ((Z_TYPE(EX(This)) == IS_OBJECT) ? &EX(This) : NULL)
 
 static inline vapor_engine *php_vapor_engine_from_obj(zend_object *obj)
 {
@@ -81,7 +81,6 @@ static inline vapor_template *php_vapor_template_from_obj(zend_object *obj)
     return (vapor_template *)((char *)(obj)-XtOffsetOf(vapor_template, std));
 }
 #define Z_VAPOR_TEMPLATE_P(zv) php_vapor_template_from_obj(Z_OBJ_P(zv))
-
 
 // ZEND_BEGIN_MODULE_GLOBALS(vapor)
 //     char *path;

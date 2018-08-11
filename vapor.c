@@ -29,7 +29,6 @@
 #include "ext/standard/php_string.h"
 #include "zend_exceptions.h"
 
-#include "debug.h"
 #include "vapor.h"
 #include "vapor_int.h"
 
@@ -51,19 +50,18 @@ zend_object_handlers vapor_object_handlers_template;
 //     vapor_globals->path = "";
 //     vapor_globals->extension = "php";
 // }
-/* }}} */
+
 
 /* {{{ PHP_INI */
 // PHP_INI_BEGIN()
 //     STD_PHP_INI_ENTRY("vapor.path", "", PHP_INI_ALL, OnUpdateString, path, zend_vapor_globals, vapor_globals)
 //     STD_PHP_INI_ENTRY("vapor.extension", "php", PHP_INI_ALL, OnUpdateString, extension, zend_vapor_globals, vapor_globals)
 // PHP_INI_END()
-/* }}} */
 
-#define VAPOR_ENGINE_GET_OBJ vapor_engine *vapor = Z_VAPOR_ENGINE_P(getThis());
 
-/* {{{ void vapor_report_error(vapor_engine *obj, char *format, ...) */
-static void vapor_report_error(vapor_engine *obj, char *format, ...)
+#define VAPOR_ENGINE_GET_OBJ vapor_engine *engine = Z_VAPOR_ENGINE_P(getThis());
+
+void vapor_report_error(vapor_engine *obj, char *format, ...)
 {
     char *message;
     va_list arg;
@@ -80,109 +78,61 @@ static void vapor_report_error(vapor_engine *obj, char *format, ...)
 
     if (message) efree(message);
 }
-/* }}} */
 
-/* {{{ void vapor_object_free_engine(zend_object *obj) */
-static void vapor_object_free_engine(zend_object *obj)
+void vapor_data_copy(zend_array *symtable, zend_array *data)
 {
-    vapor_engine *vapor = php_vapor_engine_from_obj(obj);
+    zend_string *key;
+    zval *val;
 
-    if (vapor->basepath) efree(vapor->basepath);
-    if (vapor->extension) efree(vapor->extension);
-
-    if (vapor->folders) {
-        zend_hash_destroy(vapor->folders);
-        FREE_HASHTABLE(vapor->folders);
-    }
-    if (vapor->functions) {
-        zend_hash_destroy(vapor->functions);
-        FREE_HASHTABLE(vapor->functions);
-    }
-    if (vapor->sections) {
-        zend_hash_destroy(vapor->sections);
-        FREE_HASHTABLE(vapor->sections);
+    if (UNEXPECTED(data == NULL)) {
+        return;
     }
 
-    zend_object_std_dtor(&vapor->std);
+    ZEND_HASH_FOREACH_STR_KEY_VAL(data, key, val) {
+        Z_TRY_ADDREF_P(val);
+        zend_hash_str_update(symtable, ZSTR_VAL(key), ZSTR_LEN(key), val);
+    } ZEND_HASH_FOREACH_END();
 }
-/* }}} */
 
-/* {{{ int vapor_prepare_template(vapor_engine *vapor, vapor_template *tpl, char *tplname) */
-static int vapor_prepare_template(vapor_engine *vapor, vapor_template *tpl, char *tplname)
+static zend_object *vapor_engine_new(zend_class_entry *ce)
 {
-    char *folder = NULL, *basename = NULL, *remain = NULL;
-    char path_buf[MAXPATHLEN];
+    vapor_engine *engine;
 
-    if (!strrchr(tplname, ':')) {
-        folder   = NULL;
-        basename = tplname;
-    } else {
-        folder   = php_strtok_r(tplname, ":", &remain);
-        basename = php_strtok_r(NULL, ":", &remain);
+    engine = ecalloc(1, sizeof(vapor_engine) + zend_object_properties_size(ce));
+
+    zend_object_std_init(&engine->std, ce);
+    object_properties_init(&engine->std, ce);
+    engine->std.handlers = &vapor_object_handlers_engine;
+
+    return &engine->std;
+}
+
+static void vapor_engine_free_storage(zend_object *obj)
+{
+    vapor_engine *engine = php_vapor_engine_from_obj(obj);
+
+    if (engine->basepath) {
+        efree(engine->basepath);
+    }
+    if (engine->extension) {
+        efree(engine->extension);
+    }
+    if (engine->folders) {
+        zend_hash_destroy(engine->folders);
+        FREE_HASHTABLE(engine->folders);
+    }
+    if (engine->functions) {
+        zend_hash_destroy(engine->functions);
+        FREE_HASHTABLE(engine->functions);
+    }
+    if (engine->sections) {
+        zend_hash_destroy(engine->sections);
+        FREE_HASHTABLE(engine->sections);
     }
 
-    // Check if folder exists and build filepath
-    if (folder) {
-        if (!zend_hash_str_exists(vapor->folders, folder, strlen(folder))) {
-            vapor_report_error(vapor, "Folder \"%s\" does not exists", folder);
-            efree(tplname);
-            return FAILURE;
-        }
-        zval *path = zend_hash_str_find(vapor->folders, folder, strlen(folder));
-        if (vapor->extension) {
-            slprintf(path_buf, sizeof(path_buf), "%s/%s.%s", Z_STRVAL_P(path), basename, vapor->extension);
-        } else {
-            slprintf(path_buf, sizeof(path_buf), "%s/%s", Z_STRVAL_P(path), basename);
-        }
-    } else {
-        if (vapor->extension) {
-            slprintf(path_buf, sizeof(path_buf), "%s/%s.%s", vapor->basepath, basename, vapor->extension);
-        } else {
-            slprintf(path_buf, sizeof(path_buf), "%s/%s", vapor->basepath, basename);
-        }
-    }
-
-    // All members must be initialized
-    tpl->initialized = 1;
-    tpl->folder      = (folder != NULL) ? estrdup(folder) : NULL;
-    tpl->basename    = estrdup(basename);
-    tpl->filepath    = estrdup(path_buf);
-    tpl->layout      = NULL;
-
-    efree(tplname);
-    return SUCCESS;
+    zend_object_std_dtor(&engine->std);
 }
-/* }}} */
 
-/* {{{ void vapor_free_template(vapor_template *tpl) */
-static void vapor_free_template(vapor_template *tpl)
-{
-    if (!tpl) return;
-
-    if (tpl->folder) efree(tpl->folder);
-    if (tpl->basename) efree(tpl->basename);
-    if (tpl->filepath) efree(tpl->filepath);
-
-    efree(tpl);
-}
-/* }}} */
-
-/* {{{ zend_object *vapor_object_new_engine(zend_class_entry *ce) */
-static zend_object *vapor_object_new_engine(zend_class_entry *ce)
-{
-    vapor_engine *vapor;
-
-    vapor = ecalloc(1, sizeof(vapor_engine) + zend_object_properties_size(ce));
-
-    zend_object_std_init(&vapor->std, ce);
-    object_properties_init(&vapor->std, ce);
-    vapor->std.handlers = &vapor_object_handlers_engine;
-
-    return &vapor->std;
-}
-/* }}} */
-
-/* {{{ zval *vapor_object_get_property_engine(zval *object, zval *member, int type, void **cache_slot, zval *rv) */
 static zval *vapor_object_get_property_engine(zval *object, zval *member, int type, void **cache_slot, zval *rv)
 {
     zval tmp_member;
@@ -203,9 +153,7 @@ static zval *vapor_object_get_property_engine(zval *object, zval *member, int ty
 
     return retval;
 }
-/* }}} */
 
-/* {{{ void vapor_object_set_property_engine(zval *object, zval *key, zval *value, void **cache_slot) */
 static void vapor_object_set_property_engine(zval *object, zval *key, zval *value, void **cache_slot)
 {
     vapor_engine *vapor = Z_VAPOR_ENGINE_P(object);
@@ -213,123 +161,19 @@ static void vapor_object_set_property_engine(zval *object, zval *key, zval *valu
 
     std_object_handlers.write_property(object, key, value, cache_slot);
 }
-/* }}} */
 
-/* {{{ int vapor_get_callback(INTERNAL_FUNCTION_PARAMETERS, char *func_name, zval **callback) */
 static int vapor_get_callback(INTERNAL_FUNCTION_PARAMETERS, char *func_name, zval **callback)
 {
-    VAPOR_ENGINE_GET_OBJ;
+    VAPOR_ENGINE_GET_OBJ
 
-    if ((*callback = zend_hash_str_find(vapor->functions, func_name, strlen(func_name))) != NULL) {
+    if ((*callback = zend_hash_str_find(engine->functions, func_name, strlen(func_name))) != NULL) {
         if (zend_is_callable(*callback, 0, 0)) {
             return SUCCESS;
         }
     }
     return FAILURE;
 }
-/* }}} */
 
-/* {{{ void vapor_copy_userdata(zend_array *symtable, zend_array *data) */
-static void vapor_copy_userdata(zend_array *symtable, zend_array *data)
-{
-    zend_string *key;
-    zval *val;
-
-    if (UNEXPECTED(data == NULL)) {
-        return;
-    }
-
-    ZEND_HASH_FOREACH_STR_KEY_VAL(data, key, val) {
-        Z_TRY_ADDREF_P(val);
-        zend_hash_str_update(symtable, ZSTR_VAL(key), ZSTR_LEN(key), val);
-    } ZEND_HASH_FOREACH_END();
-}
-/* }}} */
-
-/* {{{ void vapor_execute(vapor_template *tpl, zval *content) */
-static void vapor_execute(vapor_template *tpl, zval *content)
-{
-    zend_file_handle file_handle;
-    zend_op_array *op_array;
-    zval retval;
-
-    file_handle.type          = ZEND_HANDLE_FILENAME;
-    file_handle.handle.fp     = NULL;
-    file_handle.filename      = tpl->filepath;
-    file_handle.opened_path   = NULL;
-    file_handle.free_filename = 0;
-
-    php_output_start_default();
-
-    op_array = zend_compile_file(&file_handle, ZEND_INCLUDE);
-    zend_destroy_file_handle(&file_handle);
-
-    if (EXPECTED(op_array != NULL)) {
-        ZVAL_UNDEF(&retval);
-
-        zend_execute(op_array, &retval);
-        destroy_op_array(op_array);
-        efree(op_array);
-    }
-
-    php_output_get_contents(content);
-    php_output_discard();
-}
-/* }}} */
-
-/* {{{ void vapor_run(vapor_engine *vapor, vapor_template *tpl, zval *content) */
-static void vapor_run(vapor_engine *vapor, vapor_template *tpl, zval *content)
-{
-    zend_stat_t statbuf;
-
-    // 检查模板结构体是否准备就绪
-    // tpl 的准备工作是有可能失败的
-    // 比如用户指定的 folder 或 filename 无效
-    if (tpl->initialized != 1) {
-        vapor_free_template(tpl);
-        return;
-    }
-
-    // 检查模板文件路径是否正确
-    if (VCWD_STAT(tpl->filepath, &statbuf) != 0 || S_ISREG(statbuf.st_mode) == 0) {
-        vapor_report_error(vapor, "Unable to load template file");
-        vapor_free_template(tpl);
-        return;
-    }
-
-    // 检查模板文件是否被 open_basedir 限制
-    if (php_check_open_basedir(tpl->filepath)) {
-        vapor_report_error(vapor, "open_basedir restriction in effect, unable to open file");
-        vapor_free_template(tpl);
-        return;
-    }
-
-    // 清理 content 已有的数据
-    // 是由 php_output_get_contents 赋予的在堆上的字符串
-    // 所以再次使用 content 的时候，必须保证之前的内存已经被释放
-    if (content) {
-        zval_ptr_dtor(content);
-        ZVAL_UNDEF(content);
-    }
-
-    // 执行 PHP 文件
-    vapor_execute(tpl, content);
-
-    // 如果模板文件指定了 layout，递归调用本函数，执行 layout 文件
-    if (tpl->layout) {
-        zval tmp;
-        ZVAL_ZVAL(&tmp, content, 1, 0); // just COPY
-        zend_hash_str_update(vapor->sections, "content", sizeof("content") - 1, &tmp);
-
-        vapor->current = tpl->layout;
-        vapor_run(vapor, tpl->layout, content);
-    }
-
-    vapor_free_template(tpl);
-}
-/* }}} */
-
-/* {{{ proto void Engine::__construct(string path, string extension = null) */
 static PHP_METHOD(Engine, __construct)
 {
     char *path, *ext = NULL, resolved_path[MAXPATHLEN];
@@ -341,32 +185,30 @@ static PHP_METHOD(Engine, __construct)
         Z_PARAM_STRING(ext, ext_len)
     ZEND_PARSE_PARAMETERS_END();
 
-    VAPOR_ENGINE_GET_OBJ;
+    VAPOR_ENGINE_GET_OBJ
 
     if (!VCWD_REALPATH(path, resolved_path)) {
-        vapor_report_error(vapor, "Could not resolve file path");
+        vapor_report_error(engine, "Could not resolve file path");
         return;
     }
 
-    vapor->basepath  = estrdup(resolved_path);
-    vapor->extension = (ext) ? estrdup(ext): NULL;
+    engine->basepath = estrdup(resolved_path);
+    engine->extension = (ext) ? estrdup(ext): NULL;
 
-    ALLOC_HASHTABLE(vapor->folders);
-    ALLOC_HASHTABLE(vapor->sections);
-    ALLOC_HASHTABLE(vapor->functions);
+    ALLOC_HASHTABLE(engine->folders);
+    ALLOC_HASHTABLE(engine->sections);
+    ALLOC_HASHTABLE(engine->functions);
 
-    zend_hash_init(vapor->folders, 0, NULL, ZVAL_PTR_DTOR, 0);
-    zend_hash_init(vapor->sections, 0, NULL, ZVAL_PTR_DTOR, 0);
-    zend_hash_init(vapor->functions, 0, NULL, ZVAL_PTR_DTOR, 0);
+    zend_hash_init(engine->folders, 0, NULL, ZVAL_PTR_DTOR, 0);
+    zend_hash_init(engine->sections, 0, NULL, ZVAL_PTR_DTOR, 0);
+    zend_hash_init(engine->functions, 0, NULL, ZVAL_PTR_DTOR, 0);
 
-    zend_update_property_string(vapor_ce_engine, GetThis(), "basepath", sizeof("basepath") - 1, vapor->basepath);
-    if (vapor->extension) {
-        zend_update_property_string(vapor_ce_engine, GetThis(), "extension", sizeof("extension") - 1, vapor->extension);
+    zend_update_property_string(vapor_ce_engine, getThis(), "basepath", strlen("basepath"), engine->basepath);
+    if (engine->extension) {
+        zend_update_property_string(vapor_ce_engine, getThis(), "extension", strlen("extension"), engine->extension);
     }
 }
-/* }}} */
 
-/* {{{ proto string Engine::__call(...) */
 static PHP_METHOD(Engine, __call)
 {
     char *function;
@@ -410,9 +252,7 @@ static PHP_METHOD(Engine, __call)
 
     efree(params);
 }
-/* }}} */
 
-/* {{{ proto void Engine::addFolder(string name, string path, bool fallback) */
 static PHP_METHOD(Engine, addFolder)
 {
     char *folder, *path;
@@ -427,29 +267,25 @@ static PHP_METHOD(Engine, addFolder)
         Z_PARAM_BOOL(fallback)
     ZEND_PARSE_PARAMETERS_END();
 
-    VAPOR_ENGINE_GET_OBJ;
+    VAPOR_ENGINE_GET_OBJ
 
     if (!path_len || !VCWD_REALPATH(path, resolved_path)) {
-        vapor_report_error(vapor, "Could not resolve folder path");
+        vapor_report_error(engine, "Could not resolve folder path");
         return;
     }
 
     zval zv;
     ZVAL_STRING(&zv, resolved_path);
-    zend_hash_str_update(vapor->folders, folder, folder_len, &zv);
+    zend_hash_str_update(engine->folders, folder, folder_len, &zv);
 }
-/* }}} */
 
-/* {{{ proto array Engine::getFolders() */
 static PHP_METHOD(Engine, getFolders)
 {
-    VAPOR_ENGINE_GET_OBJ;
-    RETURN_ARR(zend_array_dup(vapor->folders));
+    VAPOR_ENGINE_GET_OBJ
+    RETURN_ARR(zend_array_dup(engine->folders));
 }
-/* }}} */
 
-/* {{{ proto void Engine::setExtension(string extension) */
-static PHP_METHOD(Engine, setExtension)
+static PHP_METHOD(Engine, setFileExtension)
 {
     char *ext;
     size_t ext_len;
@@ -458,18 +294,16 @@ static PHP_METHOD(Engine, setExtension)
         Z_PARAM_STRING(ext, ext_len)
     ZEND_PARSE_PARAMETERS_END();
 
-    VAPOR_ENGINE_GET_OBJ;
+    VAPOR_ENGINE_GET_OBJ
 
-    if (vapor->extension) {
-        efree(vapor->extension);
+    if (engine->extension) {
+        efree(engine->extension);
     }
-    vapor->extension = estrdup(ext);
+    engine->extension = estrdup(ext);
 
-    zend_update_property_string(vapor_ce_engine, GetThis(), ZEND_STRL("extension"), vapor->extension);
+    zend_update_property_string(vapor_ce_engine, getThis(), ZEND_STRL("extension"), engine->extension);
 }
-/* }}} */
 
-/* {{{ proto void Engine::registerFunction(string name, callable userfunc) */
 static PHP_METHOD(Engine, registerFunction)
 {
     char *name;
@@ -481,15 +315,48 @@ static PHP_METHOD(Engine, registerFunction)
         Z_PARAM_ZVAL(func)
     ZEND_PARSE_PARAMETERS_END();
 
-    VAPOR_ENGINE_GET_OBJ;
+    VAPOR_ENGINE_GET_OBJ
 
     tmp = *func;
     zval_copy_ctor(&tmp);
-    zend_hash_str_update(vapor->functions, name, len, &tmp);
+    zend_hash_str_update(engine->functions, name, len, &tmp);
 }
-/* }}} */
 
-/* {{{ proto string Engine::path() */
+static PHP_METHOD(Engine, dropFunction)
+{
+    char *name;
+    size_t len;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(name, len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    VAPOR_ENGINE_GET_OBJ
+
+    zend_hash_str_del(engine->functions, name, len);
+}
+
+static PHP_METHOD(Engine, getFunction)
+{
+    char *name;
+    size_t len;
+    zval *tmpval = NULL;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(name, len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    VAPOR_ENGINE_GET_OBJ
+
+    if ((tmpval = zend_hash_str_find(engine->functions, name, len))) {
+        ZVAL_ZVAL(return_value, tmpval, 1, 0);    // copy
+        tmpval = NULL;
+    }
+    else {
+        RETURN_NULL();
+    }
+}
+
 static PHP_METHOD(Engine, path)
 {
     char *filename = NULL;
@@ -500,18 +367,17 @@ static PHP_METHOD(Engine, path)
         Z_PARAM_STRING(filename, len)
     ZEND_PARSE_PARAMETERS_END();
 
-    VAPOR_ENGINE_GET_OBJ;
-    php_printf(vapor->current->filepath);
+    VAPOR_ENGINE_GET_OBJ
+    php_printf(engine->current->filepath);
 }
-/* }}} */
 
-/* {{{ proto void Engine::layout(string layout) */
 static PHP_METHOD(Engine, layout)
 {
-    char *layout, *layout_copy;
+    char *layout, *layoutcopy;
     size_t len;
     vapor_template *tpl;
     zend_array *data = NULL;
+    zval obj;
 
     ZEND_PARSE_PARAMETERS_START(1, 2)
         Z_PARAM_STRING(layout, len)
@@ -519,30 +385,21 @@ static PHP_METHOD(Engine, layout)
         Z_PARAM_ARRAY_HT(data)
     ZEND_PARSE_PARAMETERS_END();
 
-    VAPOR_ENGINE_GET_OBJ;
+    VAPOR_ENGINE_GET_OBJ
 
-    if (UNEXPECTED(vapor->current == NULL)) {
-        vapor_report_error(vapor, "Failed to set layout");
-        return;
+    if (UNEXPECTED(engine->current == NULL)) {
+        vapor_report_error(engine, "Failed to set layout");
+        RETURN_FALSE;
     }
 
-    // freed in vapor_run()
-    tpl = emalloc(sizeof(vapor_template));
-    memset(tpl, 0, sizeof(vapor_template));
-    vapor->current->layout = tpl;
-
-    // freed in vapor_prepare_template()
-    layout_copy = estrdup(layout);
-    if (SUCCESS == vapor_prepare_template(vapor, tpl, layout_copy)) {
-        // copy data into symbol table
-        if (UNEXPECTED(data != NULL)) {
-            vapor_copy_userdata(zend_rebuild_symbol_table(), data);
-        }
+    engine->current->layout = estrdup(layout);
+    if (EXPECTED(data != NULL)) {
+        engine->current->layout_data = data;
     }
+
+    RETURN_TRUE;
 }
-/* }}} */
 
-/* {{{ proto string Engine::section(string section) */
 static PHP_METHOD(Engine, section)
 {
     char *content, *section;
@@ -553,62 +410,57 @@ static PHP_METHOD(Engine, section)
         Z_PARAM_STRING(section, len)
     ZEND_PARSE_PARAMETERS_END();
 
-    VAPOR_ENGINE_GET_OBJ;
+    VAPOR_ENGINE_GET_OBJ
 
-    if (NULL != (tmp = zend_hash_str_find(vapor->sections, section, len)) && Z_TYPE_P(tmp) == IS_STRING) {
+    if (NULL != (tmp = zend_hash_str_find(engine->sections, section, len)) && Z_TYPE_P(tmp) == IS_STRING) {
         RETURN_STRING(Z_STRVAL_P(tmp));
     }
     RETURN_NULL();
 }
-/* }}} */
 
-/* {{{ proto void Engine::insert(string filename, [] data) */
 static PHP_METHOD(Engine, insert)
 {
-    char *filename, *filename_copy;
+    char *tplname, *namecopy;
     size_t len;
     vapor_template *tpl;
     zend_array *data = NULL;
+    zval obj;
 
     ZEND_PARSE_PARAMETERS_START(1, 2)
-        Z_PARAM_STRING(filename, len)
+        Z_PARAM_STRING(tplname, len)
         Z_PARAM_OPTIONAL
         Z_PARAM_ARRAY_HT(data)
     ZEND_PARSE_PARAMETERS_END();
 
-    VAPOR_ENGINE_GET_OBJ;
+    VAPOR_ENGINE_GET_OBJ
 
-    // freed in vapor_run()
-    tpl = emalloc(sizeof(vapor_template));
-    memset(tpl, 0, sizeof(vapor_template));
-    vapor->current = tpl;
+    // Make a template
+    namecopy = estrdup(tplname);
+    vapor_template_instantiate(&obj);
+    tpl = Z_VAPOR_TEMPLATE_P(&obj);
 
-    // freed in vapor_prepare_template()
-    filename_copy = estrdup(filename);
-    if (SUCCESS == vapor_prepare_template(vapor, tpl, filename_copy)) {
-        if (UNEXPECTED(data != NULL)) {
-            vapor_copy_userdata(zend_rebuild_symbol_table(), data);
-        }
-
-        // Run script
-        zval content;
-        ZVAL_UNDEF(&content);
-        vapor_execute(tpl, &content);
-
-        // Free template
-        vapor_free_template(tpl);
-
-        // Write output
-        php_output_write(Z_STRVAL(content), Z_STRLEN(content));
-        zval_ptr_dtor(&content);
-        return;
+    if (!vapor_template_initialize(tpl, engine, namecopy)) {
+        zval_ptr_dtor(&obj);
+        RETURN_FALSE;
     }
 
-    vapor_free_template(tpl);
-}
-/* }}} */
+    // Copy user data
+    if (EXPECTED(data != NULL)) {
+        vapor_data_copy(zend_rebuild_symbol_table(), data);
+    }
 
-/* {{{ proto string Engine::escape(string var) */
+    // Render template
+    zval content;
+    ZVAL_NULL(&content);
+    vapor_template_render(engine, tpl, NULL, &content);
+    php_printf("%s", Z_STRVAL(content));
+
+    // free
+    zval_ptr_dtor(&obj);
+    zval_ptr_dtor(&content);
+    efree(namecopy);
+}
+
 static PHP_METHOD(Engine, escape)
 {
     char *str = NULL;
@@ -663,15 +515,39 @@ static PHP_METHOD(Engine, escape)
 
     RETURN_STR(escaped);
 }
-/* }}} */
 
-/* {{{ proto string Engine::render(string tplname, array data) */
+static PHP_METHOD(Engine, make)
+{
+    char *tplname, *namecopy;
+    size_t len;
+    vapor_template *tpl;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(tplname, len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    VAPOR_ENGINE_GET_OBJ
+
+    namecopy = estrdup(tplname);
+
+    vapor_template_instantiate(return_value);
+    tpl = Z_VAPOR_TEMPLATE_P(return_value);
+
+    if (!vapor_template_initialize(Z_VAPOR_TEMPLATE_P(return_value), engine, namecopy)) {
+        zval_ptr_dtor(return_value);
+        RETURN_FALSE;
+    }
+
+    efree(namecopy);
+}
+
 static PHP_METHOD(Engine, render)
 {
-    char *tplname, *tplname_copy;
+    char *tplname, *namecopy;
     size_t len;
     vapor_template *tpl;
     zend_array *data = NULL;
+    zval obj;
 
     ZEND_PARSE_PARAMETERS_START(1, 2)
         Z_PARAM_STRING(tplname, len)
@@ -679,31 +555,29 @@ static PHP_METHOD(Engine, render)
         Z_PARAM_ARRAY_HT(data)
     ZEND_PARSE_PARAMETERS_END();
 
-    // freed in vapor_run()
-    tpl = emalloc(sizeof(vapor_template));
-    memset(tpl, 0, sizeof(vapor_template));
+    VAPOR_ENGINE_GET_OBJ
 
-    VAPOR_ENGINE_GET_OBJ;
-    vapor->current = tpl;
+    // Make a template
+    namecopy = estrdup(tplname);
+    vapor_template_instantiate(&obj);
+    tpl = Z_VAPOR_TEMPLATE_P(&obj);
 
-    // freed in vapor_prepare_template()
-    tplname_copy = estrdup(tplname);
-    if (SUCCESS == vapor_prepare_template(vapor, tpl, tplname_copy)) {
-        if (EXPECTED(data != NULL)) {
-            vapor_copy_userdata(zend_rebuild_symbol_table(), data);
-        }
+    if (!vapor_template_initialize(tpl, engine, namecopy)) {
+        zval_ptr_dtor(&obj);
+        RETURN_FALSE;
+    }
+    engine->current = tpl;
 
-        zval content;
-        ZVAL_UNDEF(&content);
-        vapor_run(vapor, tpl, &content);
-
-        ZVAL_ZVAL(return_value, &content, 0, 1);
-        return;
+    // Copy user data
+    if (EXPECTED(data != NULL)) {
+        vapor_data_copy(zend_rebuild_symbol_table(), data);
     }
 
-    vapor_free_template(tpl);
+    // Render template
+    ZVAL_NULL(return_value);
+    vapor_template_render(engine, tpl, NULL, return_value);
+    zval_ptr_dtor(&obj);
 }
-/* }}} */
 
 /* {{{ arginfo */
 ZEND_BEGIN_ARG_INFO_EX(arginfo__construct, 0, 0, 1)
@@ -731,6 +605,14 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_register_func, 0, 0, 2)
     ZEND_ARG_INFO(0, userfunc)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_drop_func, 0, 0, 1)
+    ZEND_ARG_INFO(0, name)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_get_func, 0, 0, 1)
+    ZEND_ARG_INFO(0, name)
+ZEND_END_ARG_INFO()
+
 ZEND_BEGIN_ARG_INFO_EX(arginfo_path, 0, 0, 0)
     ZEND_ARG_INFO(0, filename)
 ZEND_END_ARG_INFO()
@@ -754,69 +636,80 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_escape, 0, 0, 1)
     ZEND_ARG_INFO(0, funcs)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_make, 0, 0, 1)
+    ZEND_ARG_INFO(0, tplname)
+ZEND_END_ARG_INFO()
+
 ZEND_BEGIN_ARG_INFO_EX(arginfo_render, 0, 0, 1)
     ZEND_ARG_INFO(0, filename)
     ZEND_ARG_INFO(0, data)
 ZEND_END_ARG_INFO()
-/* }}} */
+
 
 /* {{{ vapor_methods_engine[] : Vapor\Engine class */
 static const zend_function_entry vapor_methods_engine[] = {
-    PHP_ME(Engine,       __construct,        arginfo__construct,     ZEND_ACC_PUBLIC | ZEND_ACC_CTOR)
-    PHP_ME(Engine,       __call,             arginfo__call,          ZEND_ACC_PUBLIC | ZEND_ACC_FINAL)
-    PHP_ME(Engine,       addFolder,          arginfo_add_folder,     ZEND_ACC_PUBLIC)
-    PHP_ME(Engine,       getFolders,         NULL,                   ZEND_ACC_PUBLIC)
-    PHP_ME(Engine,       setExtension,       arginfo_set_extension,  ZEND_ACC_PUBLIC)
-    PHP_ME(Engine,       registerFunction,   arginfo_register_func,  ZEND_ACC_PUBLIC)
-    PHP_ME(Engine,       path,               arginfo_path,           ZEND_ACC_PUBLIC)
-    PHP_ME(Engine,       layout,             arginfo_layout,         ZEND_ACC_PUBLIC)
-    PHP_ME(Engine,       section,            arginfo_section,        ZEND_ACC_PUBLIC)
-    PHP_ME(Engine,       insert,             arginfo_insert,         ZEND_ACC_PUBLIC)
-    PHP_ME(Engine,       escape,             arginfo_escape,         ZEND_ACC_PUBLIC)
-    PHP_ME(Engine,       render,             arginfo_render,         ZEND_ACC_PUBLIC)
-    PHP_MALIAS(Engine,   e,      escape,     arginfo_escape,         ZEND_ACC_PUBLIC)
+    PHP_ME(Engine,      __construct,        arginfo__construct,     ZEND_ACC_PUBLIC | ZEND_ACC_CTOR)
+    PHP_ME(Engine,      __call,             arginfo__call,          ZEND_ACC_PUBLIC | ZEND_ACC_FINAL)
+    PHP_ME(Engine,      addFolder,          arginfo_add_folder,     ZEND_ACC_PUBLIC)
+    PHP_ME(Engine,      getFolders,         NULL,                   ZEND_ACC_PUBLIC)
+    PHP_ME(Engine,      setFileExtension,   arginfo_set_extension,  ZEND_ACC_PUBLIC)
+    PHP_ME(Engine,      registerFunction,   arginfo_register_func,  ZEND_ACC_PUBLIC)
+    PHP_ME(Engine,      dropFunction,       arginfo_drop_func,      ZEND_ACC_PUBLIC)
+    PHP_ME(Engine,      getFunction,        arginfo_get_func,       ZEND_ACC_PUBLIC)
+    PHP_ME(Engine,      path,               arginfo_path,           ZEND_ACC_PUBLIC)
+    PHP_ME(Engine,      layout,             arginfo_layout,         ZEND_ACC_PUBLIC)
+    PHP_ME(Engine,      section,            arginfo_section,        ZEND_ACC_PUBLIC)
+    PHP_ME(Engine,      insert,             arginfo_insert,         ZEND_ACC_PUBLIC)
+    PHP_ME(Engine,      escape,             arginfo_escape,         ZEND_ACC_PUBLIC)
+    PHP_ME(Engine,      make,               arginfo_make,           ZEND_ACC_PUBLIC)
+    PHP_ME(Engine,      render,             arginfo_render,         ZEND_ACC_PUBLIC)
+    PHP_MALIAS(Engine,  e,      escape,     arginfo_escape,         ZEND_ACC_PUBLIC)
     PHP_FE_END
 };
-/* }}} */
 
 /* {{{ vapor_methods_exception[] : Vapor\Exception class */
 static const zend_function_entry vapor_methods_exception[] = {
     PHP_FE_END
 };
-/* }}} */
 
 /* {{{ PHP_MINIT_FUNCTION */
 PHP_MINIT_FUNCTION(vapor)
 {
-    zend_class_entry ce_engine, ce_exception;
+    zend_class_entry ce_engine, ce_template, ce_exception;
 
     // register resource dtor
     // le_vapor = zend_register_list_destructors_ex(vapor_resource_dtor, NULL, "Vapor Template", module_number);
 
     // REGISTER_INI_ENTRIES();
 
-    // Class Vapor\Engine
+    // Register Class Vapor\Engine
     INIT_NS_CLASS_ENTRY(ce_engine, "Vapor", "Engine", vapor_methods_engine);
-    ce_engine.create_object = vapor_object_new_engine;
+    ce_engine.create_object = vapor_engine_new;
     vapor_ce_engine = zend_register_internal_class(&ce_engine);
     memcpy(&vapor_object_handlers_engine, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
     vapor_object_handlers_engine.offset = XtOffsetOf(vapor_engine, std);
-    vapor_object_handlers_engine.free_obj = vapor_object_free_engine;
+    vapor_object_handlers_engine.free_obj = vapor_engine_free_storage;
     vapor_object_handlers_engine.read_property = vapor_object_get_property_engine;
     vapor_object_handlers_engine.write_property = vapor_object_set_property_engine;
     zend_declare_property_null(vapor_ce_engine, ZEND_STRL("basepath"), ZEND_ACC_PUBLIC);
     zend_declare_property_null(vapor_ce_engine, ZEND_STRL("extension"), ZEND_ACC_PUBLIC);
 
-    // Class Vapor\Template
-    vapor_template_init();
+    // Register Class Vapor\Template
+    INIT_NS_CLASS_ENTRY(ce_template, "Vapor", "Template", vapor_methods_template);
+    ce_template.create_object = vapor_template_new;
+    vapor_ce_template = zend_register_internal_class(&ce_template);
+    memcpy(&vapor_object_handlers_template, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
+    vapor_object_handlers_template.offset = XtOffsetOf(vapor_template, std);
+    vapor_object_handlers_template.free_obj = vapor_template_free_storage;
+    vapor_object_handlers_template.read_property = vapor_object_get_property_template;
+    vapor_object_handlers_template.write_property = vapor_object_set_property_template;
 
-    // Class Vapor\Exception
+    // Register Class Vapor\Exception
     INIT_NS_CLASS_ENTRY(ce_exception, "Vapor", "Exception", vapor_methods_exception);
     vapor_ce_exception = zend_register_internal_class_ex(&ce_exception, zend_ce_exception);
 
     return SUCCESS;
 }
-/* }}} */
 
 /* {{{ PHP_MSHUTDOWN_FUNCTION */
 PHP_MSHUTDOWN_FUNCTION(vapor)
@@ -824,7 +717,6 @@ PHP_MSHUTDOWN_FUNCTION(vapor)
     // UNREGISTER_INI_ENTRIES();
     return SUCCESS;
 }
-/* }}} */
 
 /* {{{ PHP_MINFO_FUNCTION */
 PHP_MINFO_FUNCTION(vapor)
@@ -836,7 +728,6 @@ PHP_MINFO_FUNCTION(vapor)
 
     // DISPLAY_INI_ENTRIES();
 }
-/* }}} */
 
 /* {{{ vapor_module_entry */
 zend_module_entry vapor_module_entry = {
@@ -851,7 +742,6 @@ zend_module_entry vapor_module_entry = {
     VAPOR_VERSION,
     STANDARD_MODULE_PROPERTIES
 };
-/* }}} */
 
 #ifdef COMPILE_DL_VAPOR
     #ifdef ZTS

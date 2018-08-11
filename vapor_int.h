@@ -18,7 +18,26 @@
 
 /* $Id$ */
 
+extern zend_class_entry *vapor_ce_engine;
 extern zend_class_entry *vapor_ce_template;
 extern zend_object_handlers vapor_object_handlers_template;
 
-void vapor_template_init(void);
+extern const zend_function_entry vapor_methods_template[];
+
+void zend_array_dump(zend_array *data);
+void vapor_engine_dump(vapor_engine *val);
+void vapor_template_dump(vapor_template *val);
+
+void vapor_report_error(vapor_engine *obj, char *format, ...);
+void vapor_data_copy(zend_array *symtable, zend_array *data);
+
+zend_object *vapor_template_new(zend_class_entry *ce);
+void vapor_template_free_storage(zend_object *obj);
+zval *vapor_object_get_property_template(zval *object, zval *member, int type, void **cache_slot, zval *rv);
+void vapor_object_set_property_template(zval *object, zval *key, zval *value, void **cache_slot);
+void vapor_template_parse_name(char *tplname, char **folder, char **basename);
+int  vapor_template_check_folder(zend_array *folders, char *folder);
+void vapor_template_filepath(vapor_engine *engine, char *folder, char *basename, char **filepath);
+zval *vapor_template_instantiate(zval *object);
+int  vapor_template_initialize(vapor_template *tpobj, vapor_engine *engine, char *tplname);
+void vapor_template_render(vapor_engine *engine, vapor_template *tpl, zend_array *data, zval *content);

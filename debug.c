@@ -19,6 +19,7 @@
 /* $Id$ */
 
 #include "php.h"
+#include "vapor.h"
 #include "ext/standard/php_var.h"
 
 void zend_array_dump(zend_array *data)
@@ -28,4 +29,30 @@ void zend_array_dump(zend_array *data)
         ZVAL_ARR(&tmp, data);
         php_var_dump(&tmp, 0);
     }
+}
+
+void vapor_engine_dump(vapor_engine *val)
+{
+    php_printf("[object vapor_engine] = {\n\
+    basepath  = %s\n\
+    extension = %s\n\
+    exception = %d\n\
+}\n\n",
+    val->basepath,
+    val->extension,
+    val->exception);
+}
+
+void vapor_template_dump(vapor_template *val)
+{
+    php_printf("[object vapor_template] = {\n\
+    initialized = %d\n\
+    folder      = %s\n\
+    basename    = %s\n\
+    filepath    = %s\n\
+}\n\n",
+    val->initialized,
+    val->folder,
+    val->basename,
+    val->filepath);
 }
