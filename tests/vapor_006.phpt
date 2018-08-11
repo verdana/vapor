@@ -1,5 +1,5 @@
 --TEST--
-Check for vapor layout()
+Check for vapor Engine::layout()
 --SKIPIF--
 <?php if (!extension_loaded("vapor")) {
     print "skip";

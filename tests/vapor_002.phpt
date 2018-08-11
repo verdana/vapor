@@ -1,5 +1,5 @@
 --TEST--
-Check for vapor constructor
+Check for vapor Engine::__constructor()
 --SKIPIF--
 <?php if (!extension_loaded("vapor")) {
     print "skip";

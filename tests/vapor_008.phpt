@@ -1,5 +1,5 @@
 --TEST--
-Check for vapor template constructor
+Check for vapor Template::__constructor()
 --SKIPIF--
 <?php if (!extension_loaded("vapor")) {
     print "skip";
@@ -7,9 +7,18 @@ Check for vapor template constructor
 ?>
 --FILE--
 <?php
-$t = new Vapor\Template('index');
+$v = new Vapor\Engine('/tmp', 'php');
+$t = new Vapor\Template($v, 'home');
+
+var_dump($v);
 var_dump($t);
 ?>
 --EXPECT--
-object(Vapor\Template)#1 (0) {
+object(Vapor\Engine)#1 (2) {
+  ["basepath"]=>
+  string(4) "/tmp"
+  ["extension"]=>
+  string(3) "php"
+}
+object(Vapor\Template)#2 (0) {
 }

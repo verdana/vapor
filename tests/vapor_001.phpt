@@ -1,5 +1,5 @@
 --TEST--
-Check for vapor presence
+Check for vapor extension presence
 --SKIPIF--
 <?php if (!extension_loaded("vapor")) {
     print "skip";
