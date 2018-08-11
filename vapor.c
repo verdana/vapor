@@ -25,6 +25,7 @@
 #include "php.h"
 #include "php_ini.h"
 #include "ext/standard/html.h"
+#include "ext/standard/html_tables.h"
 #include "ext/standard/info.h"
 #include "ext/standard/php_string.h"
 #include "zend_exceptions.h"
@@ -473,7 +474,7 @@ static PHP_METHOD(Engine, escape)
         Z_PARAM_STR(callbacks)
     ZEND_PARSE_PARAMETERS_END();
 
-    escaped = php_escape_html_entities(str, strlen(str), 0, ENT_QUOTES | ENT_SUBSTITUTE, NULL);
+    escaped = php_escape_html_entities(str, strlen(str), 0, ENT_QUOTES | ENT_SUBSTITUTE, cs_utf_8);
 
     if (callbacks && ZSTR_LEN(callbacks) > 0) {
         zval used_callbacks;
