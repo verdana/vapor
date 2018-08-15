@@ -50,9 +50,11 @@ void vapor_template_dump(vapor_template *val)
     folder      = %s\n\
     basename    = %s\n\
     filepath    = %s\n\
+    layout_name = %s\n\
 }\n\n",
     val->initialized,
     val->folder,
     val->basename,
-    val->filepath);
+    val->filepath,
+    val->layout_name);
 }

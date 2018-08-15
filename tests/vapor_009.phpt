@@ -7,8 +7,12 @@ Check for vapor Engine::make()
 ?>
 --FILE--
 <?php
-$v = new Vapor\Engine('/tmp', 'php');
-$tpl = $v->make('home');
+$fp = tmpfile();
+fwrite($fp, '<h1>The quick brown fox jumped over the lazy dog.</h1>');
+$filename = basename(stream_get_meta_data($fp)['uri']);
+
+$v = new Vapor\Engine('/tmp');
+$tpl = $v->make($filename);
 
 var_dump($tpl);
 ?>

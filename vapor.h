@@ -49,23 +49,22 @@ typedef struct _vapor_engine    vapor_engine;
 typedef struct _vapor_template  vapor_template;
 
 struct _vapor_engine {
-    char            *basepath;      //   0
-    char            *extension;     //   8
-    zend_array      *folders;       //  16
-    zend_array      *functions;     //  24
-    zend_array      *sections;      //  32
-    vapor_template  *current;       //  40
-    zend_bool        exception;     //
-    zend_object      std;           // 104
+    char            *basepath;
+    char            *extension;
+    zend_array      *folders;
+    zend_array      *functions;
+    zend_bool        exception;
+    zend_object      std;
 };
 
 struct _vapor_template {
-    zend_bool        initialized;   //
-    char            *folder;        //
-    char            *basename;      //
-    char            *filepath;      //
-    char            *layout;        //
-    zend_array      *layout_data;   //
+    zend_bool        initialized;
+    char            *folder;
+    char            *basename;
+    char            *filepath;
+    char            *layout_name;
+    zend_array      *layout_data;
+    zend_array      *sections;
     vapor_engine    *engine;
     zend_object      std;
 };

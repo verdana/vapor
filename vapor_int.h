@@ -30,6 +30,7 @@ void vapor_template_dump(vapor_template *val);
 
 void vapor_report_error(vapor_engine *obj, char *format, ...);
 void vapor_data_copy(zend_array *symtable, zend_array *data);
+int vapor_get_callback(zend_array *functions, char *func_name, zval **callback);
 
 zend_object *vapor_template_new(zend_class_entry *ce);
 void vapor_template_free_storage(zend_object *obj);
@@ -40,4 +41,4 @@ int  vapor_template_check_folder(zend_array *folders, char *folder);
 void vapor_template_filepath(vapor_engine *engine, char *folder, char *basename, char **filepath);
 zval *vapor_template_instantiate(zval *object);
 int  vapor_template_initialize(vapor_template *tpobj, vapor_engine *engine, char *tplname);
-void vapor_template_render(vapor_engine *engine, vapor_template *tpl, zend_array *data, zval *content);
+void vapor_template_render(vapor_template *tpl, zend_array *data, zval *content);
