@@ -18,6 +18,9 @@ $f = $v->getFunction('tolower');
 var_dump($f);
 var_dump($f('HELLO WORLD'));
 
+// __call
+var_dump($v->tolower('HELLO VAPOR'));
+
 // drop function
 $v->dropFunction('tolower');
 
@@ -25,8 +28,7 @@ $v->dropFunction('tolower');
 $v->dropFunction('invalid');
 
 // check again
-$f2 = $v->getFunction('tolower');
-var_dump($f2);
+var_dump($v->getFunction('tolower'));
 ?>
 --EXPECT--
 object(Closure)#2 (1) {
@@ -37,4 +39,5 @@ object(Closure)#2 (1) {
   }
 }
 string(11) "hello world"
+string(11) "hello vapor"
 NULL
