@@ -41,4 +41,3 @@ int  vapor_template_check_folder(zend_array *folders, char *folder);
 void vapor_template_filepath(vapor_engine *engine, char *folder, char *basename, char **filepath);
 zval *vapor_template_instantiate(zval *object);
 int  vapor_template_initialize(vapor_template *tpobj, vapor_engine *engine, char *tplname);
-void vapor_template_render(vapor_template *tpl, zend_array *data, zval *content);

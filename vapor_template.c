@@ -220,61 +220,6 @@ void vapor_template_execute(vapor_template *tpl, zval *content)
     php_output_discard();
 }
 
-void vapor_template_render(vapor_template *tpl, zend_array *data, zval *content)
-{
-    // 检查模板结构体是否准备就绪
-    // tpl 的准备工作是有可能失败的
-    // 比如用户指定的 folder 或 filename 无效
-    if (tpl->initialized != 1) {
-        return;
-    }
-
-    // 清理 content 已有的数据
-    // 是由 php_output_get_contents 赋予的在堆上的字符串
-    // 所以再次使用 content 的时候，必须保证之前的内存已经被释放
-    if (content) {
-        zval_ptr_dtor(content);
-        ZVAL_UNDEF(content);
-    }
-
-    // 复制数据
-    if (data) {
-        vapor_data_copy(zend_rebuild_symbol_table(), data);
-    }
-
-    // 执行 PHP 文件
-    vapor_template_execute(tpl, content);
-
-    // 如果模板文件指定了 layout，递归调用本函数，执行 layout 文件
-    if (tpl->layout_name) {
-        zval foo;
-        ZVAL_ZVAL(&foo, content, 1, 0); // just COPY
-        zend_hash_str_update(tpl->sections, "content", strlen("content"), &foo);
-
-        // 初始化一个模板对象处理布局文件
-        zval baz, retval;
-        vapor_template_instantiate(&baz);
-
-        // zend_call_method_with_2_params(&baz, Z_OBJCE_P(&baz), &vapor_ce_template->constructor, "__construct", &retval, tpl->engine, tpl->layout);
-
-        // vapor_template *layout_obj;
-        // zval baz;
-        // vapor_template_instantiate(&baz);
-        // layout_obj = Z_VAPOR_TEMPLATE_P(&baz);
-
-        // if (!vapor_template_initialize(layout_obj, tpl->engine, tpl->layout)) {
-        //     zval_ptr_dtor(&baz);
-        //     return;
-        // }
-
-        // 继续渲染布局文件
-        // vapor_template_render(layout_obj, tpl->layout_data, content);
-
-        // 清理
-        // zval_ptr_dtor(&baz);
-    }
-}
-
 static PHP_METHOD(Template, __construct)
 {
     char *tplname, *namecopy;
@@ -408,7 +353,7 @@ static PHP_METHOD(Template, insert)
     size_t len;
     vapor_template *tpl;
     zend_array *data = NULL;
-    zval obj;
+    zval content;
 
     ZEND_PARSE_PARAMETERS_START(1, 2)
         Z_PARAM_STRING(tplname, len)
@@ -419,21 +364,26 @@ static PHP_METHOD(Template, insert)
     // Get $this variable
     VAPOR_TEMPLATE_GET_OBJ
 
-    // Make a new template
-    vapor_template_instantiate(&obj);
-    tpl = Z_VAPOR_TEMPLATE_P(&obj);
+    // Call Engine::make() to instantise a new template object
+    zval obj, arg, rv;
+    ZVAL_STRINGL(&arg, tplname, len);
+    ZVAL_OBJ(&obj, &template->engine->std);
+    zend_call_method_with_1_params(&obj, template->engine->std.ce, NULL, "make", &rv, &arg);
+    zval_ptr_dtor(&arg);
 
-    if (!vapor_template_initialize(tpl, template->engine, tplname)) {
-        zval_ptr_dtor(&obj);
-        RETURN_NULL();
+    // Call Template::render() for this template
+    if (data == NULL) {
+        zend_call_method_with_0_params(&rv, Z_OBJCE(rv), NULL, "render", &content);
+    } else {
+        zval arg1;
+        ZVAL_ARR(&arg1, data);
+        zend_call_method_with_1_params(&rv, Z_OBJCE(rv), NULL, "render", &content, &arg1);
+        zval_ptr_dtor(&arg1);
     }
+    zval_ptr_dtor(&rv);
 
-    // Render template
-    zval content;
-    ZVAL_UNDEF(&content);
-    vapor_template_render(tpl, data, &content);
+    // Send to output
     php_printf("%s", Z_STRVAL(content));
-    zval_ptr_dtor(&obj);
     zval_ptr_dtor(&content);
 }
 
