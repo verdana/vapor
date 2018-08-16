@@ -293,8 +293,7 @@ static PHP_METHOD(Template, __construct)
     vapor_template_instantiate(return_value);
     tpl = Z_VAPOR_TEMPLATE_P(return_value);
 
-    namecopy = estrdup(tplname);
-    if (!vapor_template_initialize(Z_VAPOR_TEMPLATE_P(return_value), engine, namecopy)) {
+    if (!vapor_template_initialize(Z_VAPOR_TEMPLATE_P(return_value), engine, tplname)) {
         zval_ptr_dtor(return_value);
         RETURN_FALSE;
     }
