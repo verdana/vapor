@@ -351,20 +351,6 @@ static PHP_METHOD(Engine, getFunction)
     }
 }
 
-static PHP_METHOD(Engine, path)
-{
-    char *filename = NULL;
-    size_t len;
-
-    ZEND_PARSE_PARAMETERS_START(0, 1)
-        Z_PARAM_OPTIONAL
-        Z_PARAM_STRING(filename, len)
-    ZEND_PARSE_PARAMETERS_END();
-
-    VAPOR_ENGINE_GET_OBJ
-    // php_printf(engine->current->filepath);
-}
-
 static PHP_METHOD(Engine, make)
 {
     char *tplname;
@@ -453,10 +439,6 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_get_func, 0, 0, 1)
     ZEND_ARG_INFO(0, name)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_path, 0, 0, 0)
-    ZEND_ARG_INFO(0, filename)
-ZEND_END_ARG_INFO()
-
 ZEND_BEGIN_ARG_INFO_EX(arginfo_make, 0, 0, 1)
     ZEND_ARG_INFO(0, tplname)
 ZEND_END_ARG_INFO()
@@ -477,7 +459,6 @@ static const zend_function_entry vapor_methods_engine[] = {
     PHP_ME(Engine,      registerFunction,   arginfo_register_func,  ZEND_ACC_PUBLIC)
     PHP_ME(Engine,      dropFunction,       arginfo_drop_func,      ZEND_ACC_PUBLIC)
     PHP_ME(Engine,      getFunction,        arginfo_get_func,       ZEND_ACC_PUBLIC)
-    PHP_ME(Engine,      path,               arginfo_path,           ZEND_ACC_PUBLIC)
     PHP_ME(Engine,      make,               arginfo_make,           ZEND_ACC_PUBLIC)
     PHP_ME(Engine,      render,             arginfo_render,         ZEND_ACC_PUBLIC)
 
