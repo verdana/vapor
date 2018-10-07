@@ -285,6 +285,11 @@ static PHP_METHOD(Template, render)
         zend_call_method_with_1_params(&obj, template->engine->std.ce, NULL, "make", &rv, &arg);
         zval_ptr_dtor(&arg);
 
+        if (Z_ISUNDEF(rv) || Z_ISNULL(rv)) {
+            zval_ptr_dtor(&content);
+            zend_bailout();
+        }
+
         // Copy section data, and clear "content"
         zval foo;
         ZVAL_ZVAL(&foo, &content, 0, 1); // move
@@ -364,6 +369,9 @@ static PHP_METHOD(Template, insert)
     // Get $this variable
     VAPOR_TEMPLATE_GET_OBJ
 
+    // Init content
+    ZVAL_UNDEF(&content);
+
     // Call Engine::make() to instantise a new template object
     zval obj, arg, rv;
     ZVAL_STRINGL(&arg, tplname, len);
@@ -383,8 +391,11 @@ static PHP_METHOD(Template, insert)
     zval_ptr_dtor(&rv);
 
     // Send to output
-    php_printf("%s", Z_STRVAL(content));
-    zval_ptr_dtor(&content);
+    // php_printf("%d", Z_TYPE_P(&content));
+    // if (&content) {
+    //     php_printf("%s", Z_STRVAL(content));
+    //     zval_ptr_dtor(&content);
+    // }
 }
 
 static PHP_METHOD(Template, batch)
